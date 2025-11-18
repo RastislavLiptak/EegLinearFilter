@@ -7,6 +7,8 @@
 
 #include "data_loader.h"
 #include <iostream>
+#include <vector>
+#include <iomanip>
 #include <limits>
 
 std::vector<int> loadEdfData(const char* filePath) {
@@ -18,9 +20,20 @@ std::vector<int> loadEdfData(const char* filePath) {
         return {};
     }
     
+    int barWidth = 24;
+    int totalSignals = hdr.edfsignals;
+    size_t totalSamples = (size_t)totalSignals * hdr.signalparam[0].smp_in_file;
+
+    std::cout << "Loading file: " << filePath << "\n";
+    std::cout << "----------------------------------------\n";
+    std::cout << "Signal count: " << totalSignals << "\n";
+    std::cout << "Samples in signal: " << hdr.signalparam[0].smp_in_file << "\n";
+    std::cout << "Expected sample count: " << (long long)totalSamples << "\n" << std::flush;
+    std::cout << "----------------------------------------\n";
+
     std::vector<int> allData;
-    
-    for (int signal = 0; signal < hdr.edfsignals; ++signal) {
+    allData.reserve(totalSamples);
+    for (int signal = 0; signal < totalSignals; ++signal) {
         long long numSamplesLL = hdr.signalparam[signal].smp_in_file;
 
         if (numSamplesLL < 0 || numSamplesLL > std::numeric_limits<int>::max()) {
@@ -47,9 +60,23 @@ std::vector<int> loadEdfData(const char* filePath) {
         }
         
         allData.insert(allData.end(), signalData.begin(), signalData.end());
+
+        float progress = (float)(signal + 1) / totalSignals;
+        int pos = progress * barWidth;
+
+        std::cout << "\rLoading: [";
+        for (int i = 0; i < barWidth; ++i) {
+            std::cout << (i < pos ? "█" : " ");
+        }
+        std::cout << "] " << std::setw(3) << (int)(progress * 100) << "%" << std::flush;
     }
-    
+
     edfclose_file(handle);
     
+    std::cout << "\n----------------------------------------\n";
+    std::cout << "File loaded!\n";
+    std::cout << "Loaded sample count: " << (long long)totalSamples << "\n" << std::flush;
+    std::cout << "----------------------------------------\n";
+
     return allData;
 }

@@ -16,7 +16,7 @@ int main(int argc, const char * argv[]) {
     std::vector<int> allData = loadEdfData(filePath);
     
     if (allData.empty()) {
-        std::cerr << "Error loading data – program terminating." << std::endl;
+        std::cerr << "No data loaded" << std::endl;
         return EXIT_FAILURE;
     }
     
