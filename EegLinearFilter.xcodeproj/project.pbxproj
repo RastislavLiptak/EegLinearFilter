@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D630F60D2ECC5F4A001761CF /* OpenCL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D630F60C2ECC5F4A001761CF /* OpenCL.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		D630F5FF2ECC5F40001761CF /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -20,6 +24,7 @@
 
 /* Begin PBXFileReference section */
 		D630F6012ECC5F40001761CF /* EegLinearFilter */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EegLinearFilter; sourceTree = BUILT_PRODUCTS_DIR; };
+		D630F60C2ECC5F4A001761CF /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D630F60D2ECC5F4A001761CF /* OpenCL.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -45,6 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				D630F6032ECC5F40001761CF /* EegLinearFilter */,
+				D630F60B2ECC5F4A001761CF /* Frameworks */,
 				D630F6022ECC5F40001761CF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -55,6 +62,14 @@
 				D630F6012ECC5F40001761CF /* EegLinearFilter */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D630F60B2ECC5F4A001761CF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D630F60C2ECC5F4A001761CF /* OpenCL.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
