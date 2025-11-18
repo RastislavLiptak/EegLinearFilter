@@ -23,6 +23,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D628E69F2ECCB7CE00AD2173 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		D630F6012ECC5F40001761CF /* EegLinearFilter */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EegLinearFilter; sourceTree = BUILT_PRODUCTS_DIR; };
 		D630F60C2ECC5F4A001761CF /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -53,6 +54,7 @@
 				D630F6032ECC5F40001761CF /* EegLinearFilter */,
 				D630F60B2ECC5F4A001761CF /* Frameworks */,
 				D630F6022ECC5F40001761CF /* Products */,
+				D628E69F2ECCB7CE00AD2173 /* .gitignore */,
 			);
 			sourceTree = "<group>";
 		};
