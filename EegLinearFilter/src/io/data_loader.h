@@ -12,6 +12,5 @@
 #include "../../lib/edflib/edflib.h"
 
 std::vector<float> loadEdfData(const char* filePath, const int padding = 0);
-void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& samplesToRead);
 
 #endif // DATA_LOADER_H

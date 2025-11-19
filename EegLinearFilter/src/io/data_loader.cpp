@@ -67,18 +67,13 @@ std::vector<float> loadEdfData(const char* filePath, const int padding) {
     size_t totalSamplesPadded = static_cast<size_t>(totalSignals) * samplesPerSignalPadded;
 
     const int barWidth = 24;
-
-    std::cout << "Loading file: " << filePath << "\n";
-    std::cout << "----------------------------------------\n";
-    std::cout << "Signal count: " << totalSignals << "\n";
-    std::cout << "Samples in signal: " << samplesPerSignal << "\n";
-    std::cout << "Padded samples in signal: " << samplesPerSignalPadded << "\n";
-    std::cout << "Total samples: " << rawTotalSamples << "\n";
-    std::cout << "Total alloc: " << totalSamplesPadded << "\n";
-    std::cout << "----------------------------------------\n";
-
     std::vector<double> tempBuffer(samplesPerSignal);
     std::vector<float> allData(totalSamplesPadded);
+
+    std::cout << "Loading file: " << filePath << "\n";
+    std::cout << "Signal count: " << totalSignals << "\n";
+    std::cout << "Samples in signal: " << samplesPerSignal << "\n";
+    std::cout << "Total samples: " << rawTotalSamples << "\n";
 
     for (int signal = 0; signal < totalSignals; ++signal) {
         const int read = edfread_physical_samples(handle, signal, samplesPerSignal, tempBuffer.data());
@@ -114,8 +109,7 @@ std::vector<float> loadEdfData(const char* filePath, const int padding) {
         std::cout << "] " << std::setw(3) << static_cast<int>(progress * 100) << "%" << std::flush;
     }
 
-    std::cout << "\nFile loaded!\n";
-    std::cout << "----------------------------------------\n";
+    std::cout << "\n----------------------------------------\n";
 
     return allData;
 }

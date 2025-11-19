@@ -8,13 +8,16 @@
 #include <iostream>
 #include <vector>
 #include "io/data_loader.h"
+#include "utils/convolution_kernels.h"
 
 int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN01-1.edf";
+    const int convolutionKernelRadius = 3;
+    const float convolutionKernelSigma = 1.0f;
     
     try {
-        const int padding = 0;
-        std::vector<float> allData = loadEdfData(filePath, padding);
+        const std::vector<float> convolutionKernel = createGaussianKernel(convolutionKernelRadius, convolutionKernelSigma);
+        std::vector<float> allData = loadEdfData(filePath, convolutionKernelRadius);
         
         std::cout << "Načtená data (prvních 100 vzorků z celkových " << allData.size() << "):" << std::endl;
         for (size_t i = 0; i < 100 && i < allData.size(); ++i) {
