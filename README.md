@@ -1,0 +1,1 @@
+Semester project for the KIV/PPR course comparing different approaches to computing linear convolution of EEG signals, including sequential processing, parallel processing with and without vectorization, and GPU-based computation.
