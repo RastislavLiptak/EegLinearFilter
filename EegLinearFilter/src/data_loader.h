@@ -9,10 +9,9 @@
 #define DATA_LOADER_H
 
 #include <vector>
-#include <cstdint>
 #include "../lib/edflib/edflib.h"
 
-std::vector<int16_t> loadEdfData(const char* filePath);
+std::vector<float> loadEdfData(const char* filePath);
 void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& samplesToRead);
 
 #endif // DATA_LOADER_H
