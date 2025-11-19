@@ -39,8 +39,12 @@ void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& sampl
     totalSamples = static_cast<size_t>(totalSamplesU64);
 }
 
-std::vector<float> loadEdfData(const char* filePath) {
+std::vector<float> loadEdfData(const char* filePath, const int padding) {
     edflib_hdr_t hdr;
+
+    if (padding < 0) {
+        throw std::runtime_error("Padding cannot be negative");
+    }
 
     const int handle = edfopen_file_readonly(filePath, &hdr, EDFLIB_DO_NOT_READ_ANNOTATIONS);
     if (handle < 0) {
@@ -53,37 +57,52 @@ std::vector<float> loadEdfData(const char* filePath) {
         ~EdfHandle() { edfclose_file(handle); }
     } handleGuard(handle);
 
-    size_t totalSamples = 0;
-    int samplesToRead = 0;
-    validateEdfHeader(hdr, totalSamples, samplesToRead);
+    size_t rawTotalSamples = 0;
+    int samplesPerSignal = 0;
+    validateEdfHeader(hdr, rawTotalSamples, samplesPerSignal);
+
+    const int totalSignals = hdr.edfsignals;
+    
+    size_t samplesPerSignalPadded = static_cast<size_t>(samplesPerSignal) + (2 * padding);
+    size_t totalSamplesPadded = static_cast<size_t>(totalSignals) * samplesPerSignalPadded;
 
     const int barWidth = 24;
-    const int totalSignals = hdr.edfsignals;
 
     std::cout << "Loading file: " << filePath << "\n";
     std::cout << "----------------------------------------\n";
     std::cout << "Signal count: " << totalSignals << "\n";
-    std::cout << "Samples in signal: " << samplesToRead << "\n";
-    std::cout << "Total samples: " << totalSamples << "\n";
+    std::cout << "Samples in signal: " << samplesPerSignal << "\n";
+    std::cout << "Padded samples in signal: " << samplesPerSignalPadded << "\n";
+    std::cout << "Total samples: " << rawTotalSamples << "\n";
+    std::cout << "Total alloc: " << totalSamplesPadded << "\n";
     std::cout << "----------------------------------------\n";
 
-    std::vector<double> tempBuffer(samplesToRead);
-    std::vector<float> allData;
-    allData.resize(totalSamples);
+    std::vector<double> tempBuffer(samplesPerSignal);
+    std::vector<float> allData(totalSamplesPadded);
 
     for (int signal = 0; signal < totalSignals; ++signal) {
-        const int read = edfread_physical_samples(handle, signal, samplesToRead, tempBuffer.data());
-        if (read != samplesToRead) {
+        const int read = edfread_physical_samples(handle, signal, samplesPerSignal, tempBuffer.data());
+        if (read != samplesPerSignal) {
             throw std::runtime_error("Error reading signal " + std::to_string(signal));
         }
 
-        const size_t offset = static_cast<size_t>(signal) * static_cast<size_t>(samplesToRead);
+        if (read == 0) continue;
+
+        const size_t channelStartOffset = static_cast<size_t>(signal) * samplesPerSignalPadded;
+
+        float firstVal = static_cast<float>(tempBuffer[0]);
+        float lastVal = static_cast<float>(tempBuffer[read - 1]);
+
+        std::fill_n(allData.begin() + channelStartOffset, padding, firstVal);
+
         std::transform(
             tempBuffer.begin(),
             tempBuffer.begin() + read,
-            allData.begin() + offset,
+            allData.begin() + channelStartOffset + padding,
             [](double d) { return static_cast<float>(d); }
         );
+
+        std::fill_n(allData.begin() + channelStartOffset + padding + read, padding, lastVal);
 
         const float progress = static_cast<float>(signal + 1) / totalSignals;
         const int pos = static_cast<int>(progress * barWidth);

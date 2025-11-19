@@ -13,8 +13,8 @@ int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN01-1.edf";
     
     try {
-        // TODO - padding is missing
-        std::vector<float> allData = loadEdfData(filePath);
+        const int padding = 32;
+        std::vector<float> allData = loadEdfData(filePath, padding);
         
         std::cout << "Načtená data (prvních 100 vzorků z celkových " << allData.size() << "):" << std::endl;
         for (size_t i = 0; i < 100 && i < allData.size(); ++i) {
