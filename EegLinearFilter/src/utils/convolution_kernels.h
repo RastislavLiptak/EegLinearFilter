@@ -1,5 +1,5 @@
 //
-//  convolution_kernel.h
+//  convolution_kernels.h
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 19.11.2025.

@@ -7,7 +7,6 @@
 
 #include "data_loader.h"
 #include <iostream>
-#include <vector>
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
