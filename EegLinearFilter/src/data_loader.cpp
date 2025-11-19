@@ -69,7 +69,7 @@ std::vector<float> loadEdfData(const char* filePath) {
 
     std::vector<double> tempBuffer(samplesToRead);
     std::vector<float> allData;
-    allData.reserve(totalSamples);
+    allData.resize(totalSamples);
 
     for (int signal = 0; signal < totalSignals; ++signal) {
         const int read = edfread_physical_samples(handle, signal, samplesToRead, tempBuffer.data());
@@ -77,7 +77,13 @@ std::vector<float> loadEdfData(const char* filePath) {
             throw std::runtime_error("Error reading signal " + std::to_string(signal));
         }
 
-        std::transform(tempBuffer.begin(), tempBuffer.end(), std::back_inserter(allData), [](double d) { return static_cast<float>(d); });
+        const size_t offset = static_cast<size_t>(signal) * static_cast<size_t>(samplesToRead);
+        std::transform(
+            tempBuffer.begin(),
+            tempBuffer.begin() + read,
+            allData.begin() + offset,
+            [](double d) { return static_cast<float>(d); }
+        );
 
         const float progress = static_cast<float>(signal + 1) / totalSignals;
         const int pos = static_cast<int>(progress * barWidth);
