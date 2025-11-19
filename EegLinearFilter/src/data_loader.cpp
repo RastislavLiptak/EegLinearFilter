@@ -41,7 +41,7 @@ void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& sampl
 
 std::vector<float> loadEdfData(const char* filePath) {
     edflib_hdr_t hdr;
-    
+
     const int handle = edfopen_file_readonly(filePath, &hdr, EDFLIB_DO_NOT_READ_ANNOTATIONS);
     if (handle < 0) {
         throw std::runtime_error(std::string("Data load failed: ") + filePath);
@@ -59,28 +59,25 @@ std::vector<float> loadEdfData(const char* filePath) {
 
     const int barWidth = 24;
     const int totalSignals = hdr.edfsignals;
-    const long long samplesPerSignalLL = hdr.signalparam[0].smp_in_file;
 
     std::cout << "Loading file: " << filePath << "\n";
     std::cout << "----------------------------------------\n";
     std::cout << "Signal count: " << totalSignals << "\n";
-    std::cout << "Samples in signal: " << samplesPerSignalLL << "\n";
-    std::cout << "Total sample count: " << static_cast<uint64_t>(totalSamples) << "\n" << std::flush;
+    std::cout << "Samples in signal: " << samplesToRead << "\n";
+    std::cout << "Total samples: " << totalSamples << "\n";
     std::cout << "----------------------------------------\n";
 
+    std::vector<double> tempBuffer(samplesToRead);
     std::vector<float> allData;
     allData.reserve(totalSamples);
 
     for (int signal = 0; signal < totalSignals; ++signal) {
-        std::vector<double> tempBuffer(samplesToRead);
         const int read = edfread_physical_samples(handle, signal, samplesToRead, tempBuffer.data());
         if (read != samplesToRead) {
-            throw std::runtime_error("Error reading physical samples for signal " + std::to_string(signal));
+            throw std::runtime_error("Error reading signal " + std::to_string(signal));
         }
 
-        size_t offset = allData.size();
-        allData.resize(offset + samplesToRead);
-        std::transform(tempBuffer.begin(), tempBuffer.end(), allData.begin() + offset, [](double val) { return static_cast<float>(val); });
+        std::transform(tempBuffer.begin(), tempBuffer.end(), std::back_inserter(allData), [](double d) { return static_cast<float>(d); });
 
         const float progress = static_cast<float>(signal + 1) / totalSignals;
         const int pos = static_cast<int>(progress * barWidth);
