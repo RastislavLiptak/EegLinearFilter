@@ -15,7 +15,7 @@ int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
     const int convolutionKernelRadius = 256;
     const float convolutionKernelSigma = 1.0f;
-    ProcessingMode mode = ProcessingMode::CPU_SEQ_NO_VEC;
+    ProcessingMode mode = ProcessingMode::CPU_SEQ_MANUAL_VEC;
     
     try {
         // TODO - kontrolovat, že konvoluční jádro není moc velké vzhledem k velikosti datasetu

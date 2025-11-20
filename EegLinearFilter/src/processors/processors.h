@@ -11,7 +11,8 @@
 #include <vector>
 
 enum class ProcessingMode {
-    CPU_SEQ_NO_VEC= 0,       // Sequential processing, no vectorization
+    CPU_SEQ_NO_VEC=0,        // Sequential processing, no vectorization
+    CPU_SEQ_NO_VEC_W_UNROLL, // Sequential processing, no vectorization with manual unrolling
     CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
     CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
@@ -21,7 +22,10 @@ enum class ProcessingMode {
 };
 
 void run_processor(const ProcessingMode mode, std::vector<float>& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius);
+
 void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_no_vec_w_unroll(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
 void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_manual_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
 
 #endif // PROCESSORS_H
