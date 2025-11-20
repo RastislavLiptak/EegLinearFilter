@@ -15,12 +15,11 @@ int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
     const int convolutionKernelRadius = 256;
     const float convolutionKernelSigma = 1.0f;
-    ProcessingMode mode = ProcessingMode::CPU_SEQ_MANUAL_VEC;
+    const ProcessingMode mode = ProcessingMode::CPU_SEQ_MANUAL_VEC;
     
     try {
-        // TODO - kontrolovat, že konvoluční jádro není moc velké vzhledem k velikosti datasetu
         const std::vector<float> convolutionKernel = createGaussianKernel(convolutionKernelRadius, convolutionKernelSigma);
-        std::vector<float> allData = loadEdfData(filePath, convolutionKernelRadius);
+        NeonVector allData = loadEdfData(filePath, convolutionKernelRadius);
         
         run_processor(
             mode,

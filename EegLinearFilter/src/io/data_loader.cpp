@@ -38,7 +38,7 @@ void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& sampl
     totalSamples = static_cast<size_t>(totalSamplesU64);
 }
 
-std::vector<float> loadEdfData(const char* filePath, const int padding) {
+NeonVector loadEdfData(const char* filePath, const int padding) {
     edflib_hdr_t hdr;
 
     if (padding < 0) {
@@ -61,13 +61,13 @@ std::vector<float> loadEdfData(const char* filePath, const int padding) {
     validateEdfHeader(hdr, rawTotalSamples, samplesPerSignal);
 
     const int totalSignals = hdr.edfsignals;
-    
+
     size_t samplesPerSignalPadded = static_cast<size_t>(samplesPerSignal) + (2 * padding);
     size_t totalSamplesPadded = static_cast<size_t>(totalSignals) * samplesPerSignalPadded;
 
     const int barWidth = 24;
     std::vector<double> tempBuffer(samplesPerSignal);
-    std::vector<float> allData(totalSamplesPadded);
+    NeonVector allData(totalSamplesPadded);
 
     std::cout << "Loading file: " << filePath << "\n";
     std::cout << "Signal count: " << totalSignals << "\n";

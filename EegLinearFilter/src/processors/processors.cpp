@@ -9,7 +9,7 @@
 #include <iostream>
 #include <chrono>
 
-void run_processor(const ProcessingMode mode, std::vector<float>& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius) {
+void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius) {
     
     const auto start = std::chrono::high_resolution_clock::now();
     

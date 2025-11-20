@@ -10,9 +10,7 @@
 #include <stdexcept>
 #include <arm_neon.h>
 
-// TODO jak to bude se zarovnáním v paměti?
-// TODO zjisti, jestli nepomůže, když se zarovná i kernel
-void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
     float* __restrict dataPtr = data.data();
@@ -31,7 +29,7 @@ void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& con
     }
 }
 
-void convolve_seq_no_vec_w_unroll(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
 
     float* __restrict dataPtr = data.data();
@@ -65,7 +63,7 @@ void convolve_seq_no_vec_w_unroll(std::vector<float>& data, const std::vector<fl
     }
 }
 
-void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
     float* __restrict dataPtr = data.data();
@@ -85,7 +83,7 @@ void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& c
 }
 
 // TODO - not sure if this is perfect solution
-void convolve_seq_manual_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
 

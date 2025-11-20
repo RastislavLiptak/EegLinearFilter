@@ -9,6 +9,7 @@
 #define PROCESSORS_H
 
 #include <vector>
+#include "../io/data_loader.h"
 
 enum class ProcessingMode {
     CPU_SEQ_NO_VEC=0,        // Sequential processing, no vectorization
@@ -21,11 +22,11 @@ enum class ProcessingMode {
     GPU_PAR                  // GPU-accelerated
 };
 
-void run_processor(const ProcessingMode mode, std::vector<float>& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius);
+void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius);
 
-void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_seq_no_vec_w_unroll(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_seq_manual_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 
 #endif // PROCESSORS_H
