@@ -20,7 +20,8 @@ enum class ProcessingMode {
     GPU_PAR                  // GPU-accelerated
 };
 
-template <bool Vectorize>
-void convolve_seq(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
+void run_processor(const ProcessingMode mode, std::vector<float>& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius);
+void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n);
 
 #endif // PROCESSORS_H

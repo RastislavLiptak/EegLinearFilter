@@ -9,30 +9,28 @@
 #include <cstddef>
 #include <stdexcept>
 
-template <bool Vectorize>
-void convolve_seq(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
-    if constexpr (Vectorize) {
-        for (size_t i = static_cast<size_t>(n); i < dataSize - static_cast<size_t>(n); ++i) {
-            float sum = 0.0f;
-            #pragma clang loop vectorize(enable)
-            for (int j = -n; j <= n; ++j) {
-                sum += data[i + j] * convolutionKernel[j + n];
-            }
-            data[i - n] = sum;
+    for (size_t i = static_cast<size_t>(n); i < dataSize - static_cast<size_t>(n); ++i) {
+        float sum = 0.0f;
+        #pragma clang loop vectorize(disable)
+        for (int j = -n; j <= n; ++j) {
+            sum += data[i + j] * convolutionKernel[j + n];
         }
-    } else {
-        for (size_t i = static_cast<size_t>(n); i < dataSize - static_cast<size_t>(n); ++i) {
-            float sum = 0.0f;
-            #pragma clang loop vectorize(disable)
-            for (int j = -n; j <= n; ++j) {
-                sum += data[i + j] * convolutionKernel[j + n];
-            }
-            data[i - n] = sum;
-        }
+        data[i - n] = sum;
     }
 }
 
-template void convolve_seq<true>(std::vector<float>&, const std::vector<float>&, const int);
-template void convolve_seq<false>(std::vector<float>&, const std::vector<float>&, const int);
+void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
+    const size_t dataSize = data.size();
+    
+    for (size_t i = static_cast<size_t>(n); i < dataSize - static_cast<size_t>(n); ++i) {
+        float sum = 0.0f;
+        #pragma clang loop vectorize(enable)
+        for (int j = -n; j <= n; ++j) {
+            sum += data[i + j] * convolutionKernel[j + n];
+        }
+        data[i - n] = sum;
+    }
+}
