@@ -11,20 +11,23 @@
 #include <arm_neon.h>
 
 // TODO jak to bude se zarovnáním v paměti?
+// TODO zjisti, jestli nepomůže, když se zarovná i kernel
 void convolve_seq_no_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
     float* __restrict dataPtr = data.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
     
-    for (size_t i = n; i < dataSize - n; ++i) {
+    size_t outIndex = 0;
+    
+    for (size_t i = n; i < dataSize - n; ++i, ++outIndex) {
         float sum = 0.0f;
         
         #pragma clang loop vectorize(disable)
         for (int j = -n; j <= n; ++j) {
             sum += dataPtr[i + j] * kernelPtr[j + n];
         }
-        dataPtr[i - n] = sum;
+        dataPtr[outIndex] = sum;
     }
 }
 
@@ -68,17 +71,20 @@ void convolve_seq_auto_vec(std::vector<float>& data, const std::vector<float>& c
     float* __restrict dataPtr = data.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
     
-    for (size_t i = n; i < dataSize - n; ++i) {
+    size_t outIndex = 0;
+    
+    for (size_t i = n; i < dataSize - n; ++i, ++outIndex) {
         float sum = 0.0f;
         
         #pragma clang loop vectorize(enable)
         for (int j = -n; j <= n; ++j) {
             sum += dataPtr[i + j] * kernelPtr[j + n];
         }
-        dataPtr[i - n] = sum;
+        dataPtr[outIndex] = sum;
     }
 }
 
+// TODO - not sure if this is perfect solution
 void convolve_seq_manual_vec(std::vector<float>& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
