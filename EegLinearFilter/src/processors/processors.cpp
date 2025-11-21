@@ -32,15 +32,19 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
             std::cout << "Mode: Parallel processing on CPU (no-vectorization)" << std::endl;
-            // TODO - process data
+            convolve_par_no_vec(allData, convolutionKernel, convolutionKernelRadius);
+            break;
+        case ProcessingMode::CPU_PAR_NO_VEC_W_UNROLL:
+            std::cout << "Mode: Parallel processing on CPU (no-vectorization + manual unrolling)" << std::endl;
+            convolve_par_no_vec_w_unroll(allData, convolutionKernel, convolutionKernelRadius);
             break;
         case ProcessingMode::CPU_PAR_AUTO_VEC:
             std::cout << "Mode: Parallel processing on CPU (auto-vectorization)" << std::endl;
-            // TODO - process data
+            convolve_par_auto_vec(allData, convolutionKernel, convolutionKernelRadius);
             break;
         case ProcessingMode::CPU_PAR_MANUAL_VEC:
             std::cout << "Mode: Parallel processing on CPU (manual-vectorization)" << std::endl;
-            // TODO - process data
+            convolve_par_manual_vec(allData, convolutionKernel, convolutionKernelRadius);
             break;
         case ProcessingMode::GPU_PAR:
             std::cout << "Mode: GPU processing" << std::endl;

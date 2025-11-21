@@ -17,6 +17,7 @@ enum class ProcessingMode {
     CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
     CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
+    CPU_PAR_NO_VEC_W_UNROLL, // Parallel processing, no vectorization with manual unrolling
     CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
     CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
     GPU_PAR                  // GPU-accelerated
@@ -28,5 +29,10 @@ void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolution
 void convolve_seq_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+
+void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 
 #endif // PROCESSORS_H
