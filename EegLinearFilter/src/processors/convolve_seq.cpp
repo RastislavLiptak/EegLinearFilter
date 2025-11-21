@@ -87,7 +87,7 @@ void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convoluti
 void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
-    size_t paddedKernelSize = (kernelSize + 3) & ~3;
+    const size_t paddedKernelSize = (kernelSize + 3) & ~3;
    
     std::vector<float> paddedKernel(paddedKernelSize, 0.0f);
     for(size_t i = 0; i < kernelSize; ++i) {
@@ -183,5 +183,4 @@ void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolu
         }
         io_ptr[o] = sum;
     }
-    
 }
