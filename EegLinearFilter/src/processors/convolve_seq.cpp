@@ -84,7 +84,7 @@ void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convoluti
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
-void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
     

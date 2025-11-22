@@ -91,117 +91,141 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
-void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
 
-    const size_t paddedKernelSize = (kernelSize + 3) & ~3;
+    const size_t outSize = dataSize - kernelSize + 1;
 
+    const size_t paddedKernelSize = (kernelSize + 3) & ~3;
     std::vector<float> paddedKernel(paddedKernelSize, 0.0f);
-    for (size_t i = 0; i < kernelSize; ++i)
-        paddedKernel[i] = convolutionKernel[i];
+    std::memcpy(paddedKernel.data(), convolutionKernel.data(), kernelSize * sizeof(float));
 
     const size_t k_blocks = paddedKernelSize / 4;
     std::vector<float32x4_t> k_vecs(k_blocks);
-
-    for (size_t b = 0; b < k_blocks; ++b)
+    for (size_t b = 0; b < k_blocks; ++b) {
         k_vecs[b] = vld1q_f32(&paddedKernel[b * 4]);
+    }
 
-    float* __restrict io_ptr = static_cast<float*>(ALIGN_HINT(data.data()));
-    float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
+    const float* __restrict inDataPtr = data.data();
+    float* __restrict outDataPtr = outputBuffer.data();
+    const float32x4_t* k_vecs_ptr = k_vecs.data();
 
-    const size_t out_count = dataSize - kernelSize + 1;
+    const size_t CHUNK_SIZE = 16384;
+    const size_t numChunks = (outSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
-    const size_t block16_count = out_count / 16;
+    dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
+        
+        size_t o = chunkIndex * CHUNK_SIZE;
+        const size_t end = std::min(o + CHUNK_SIZE, outSize);
 
-    dispatch_apply(block16_count, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t blockIndex) {
-        const size_t o = blockIndex * 16;
+        for (; o + 16 <= end; o += 16) {
+            float32x4_t sum0 = vdupq_n_f32(0.0f);
+            float32x4_t sum1 = vdupq_n_f32(0.0f);
+            float32x4_t sum2 = vdupq_n_f32(0.0f);
+            float32x4_t sum3 = vdupq_n_f32(0.0f);
+            float32x4_t sum4 = vdupq_n_f32(0.0f);
+            float32x4_t sum5 = vdupq_n_f32(0.0f);
+            float32x4_t sum6 = vdupq_n_f32(0.0f);
+            float32x4_t sum7 = vdupq_n_f32(0.0f);
+            float32x4_t sum8 = vdupq_n_f32(0.0f);
+            float32x4_t sum9 = vdupq_n_f32(0.0f);
+            float32x4_t sum10 = vdupq_n_f32(0.0f);
+            float32x4_t sum11 = vdupq_n_f32(0.0f);
+            float32x4_t sum12 = vdupq_n_f32(0.0f);
+            float32x4_t sum13 = vdupq_n_f32(0.0f);
+            float32x4_t sum14 = vdupq_n_f32(0.0f);
+            float32x4_t sum15 = vdupq_n_f32(0.0f);
 
-        __builtin_prefetch(io_ptr + o + 256, 0, 3);
+            const float* d_ptr = inDataPtr + o;
 
-        float32x4_t sum[16];
-        for (int si = 0; si < 16; ++si)
-            sum[si] = vdupq_n_f32(0.0f);
+            float32x4_t d0 = vld1q_f32(d_ptr);
+            float32x4_t d1 = vld1q_f32(d_ptr + 4);
+            float32x4_t d2 = vld1q_f32(d_ptr + 8);
+            float32x4_t d3 = vld1q_f32(d_ptr + 12);
+            float32x4_t d4;
 
-        const float* d_ptr = io_ptr + o;
+            for (size_t b = 0; b < k_blocks; ++b) {
+                const float32x4_t k = k_vecs_ptr[b];
 
-        float32x4_t d0 = vld1q_f32(d_ptr);
-        float32x4_t d1 = vld1q_f32(d_ptr + 4);
-        float32x4_t d2 = vld1q_f32(d_ptr + 8);
-        float32x4_t d3 = vld1q_f32(d_ptr + 12);
-        float32x4_t d4;
+                d4 = vld1q_f32(d_ptr + (b + 4) * 4);
 
-        for (size_t b = 0; b < k_blocks; ++b) {
-            float32x4_t k = k_vecs[b];
+                sum0 = vfmaq_f32(sum0, d0, k);
+                sum1 = vfmaq_f32(sum1, vextq_f32(d0, d1, 1), k);
+                sum2 = vfmaq_f32(sum2, vextq_f32(d0, d1, 2), k);
+                sum3 = vfmaq_f32(sum3, vextq_f32(d0, d1, 3), k);
 
-            d4 = vld1q_f32(d_ptr + (b + 4) * 4);
+                sum4 = vfmaq_f32(sum4, d1, k);
+                sum5 = vfmaq_f32(sum5, vextq_f32(d1, d2, 1), k);
+                sum6 = vfmaq_f32(sum6, vextq_f32(d1, d2, 2), k);
+                sum7 = vfmaq_f32(sum7, vextq_f32(d1, d2, 3), k);
 
-            sum[0]  = vfmaq_f32(sum[0],  d0, k);
-            sum[1]  = vfmaq_f32(sum[1],  vextq_f32(d0, d1, 1), k);
-            sum[2]  = vfmaq_f32(sum[2],  vextq_f32(d0, d1, 2), k);
-            sum[3]  = vfmaq_f32(sum[3],  vextq_f32(d0, d1, 3), k);
+                sum8 = vfmaq_f32(sum8, d2, k);
+                sum9 = vfmaq_f32(sum9, vextq_f32(d2, d3, 1), k);
+                sum10 = vfmaq_f32(sum10, vextq_f32(d2, d3, 2), k);
+                sum11 = vfmaq_f32(sum11, vextq_f32(d2, d3, 3), k);
 
-            sum[4]  = vfmaq_f32(sum[4],  d1, k);
-            sum[5]  = vfmaq_f32(sum[5],  vextq_f32(d1, d2, 1), k);
-            sum[6]  = vfmaq_f32(sum[6],  vextq_f32(d1, d2, 2), k);
-            sum[7]  = vfmaq_f32(sum[7],  vextq_f32(d1, d2, 3), k);
+                sum12 = vfmaq_f32(sum12, d3, k);
+                sum13 = vfmaq_f32(sum13, vextq_f32(d3, d4, 1), k);
+                sum14 = vfmaq_f32(sum14, vextq_f32(d3, d4, 2), k);
+                sum15 = vfmaq_f32(sum15, vextq_f32(d3, d4, 3), k);
 
-            sum[8]  = vfmaq_f32(sum[8],  d2, k);
-            sum[9]  = vfmaq_f32(sum[9],  vextq_f32(d2, d3, 1), k);
-            sum[10] = vfmaq_f32(sum[10], vextq_f32(d2, d3, 2), k);
-            sum[11] = vfmaq_f32(sum[11], vextq_f32(d2, d3, 3), k);
+                d0 = d1;
+                d1 = d2;
+                d2 = d3;
+                d3 = d4;
+            }
 
-            sum[12] = vfmaq_f32(sum[12], d3, k);
-            sum[13] = vfmaq_f32(sum[13], vextq_f32(d3, d4, 1), k);
-            sum[14] = vfmaq_f32(sum[14], vextq_f32(d3, d4, 2), k);
-            sum[15] = vfmaq_f32(sum[15], vextq_f32(d3, d4, 3), k);
-
-            d0 = d1;
-            d1 = d2;
-            d2 = d3;
-            d3 = d4;
+            outDataPtr[o + 0] = vaddvq_f32(sum0);
+            outDataPtr[o + 1] = vaddvq_f32(sum1);
+            outDataPtr[o + 2] = vaddvq_f32(sum2);
+            outDataPtr[o + 3] = vaddvq_f32(sum3);
+            outDataPtr[o + 4] = vaddvq_f32(sum4);
+            outDataPtr[o + 5] = vaddvq_f32(sum5);
+            outDataPtr[o + 6] = vaddvq_f32(sum6);
+            outDataPtr[o + 7] = vaddvq_f32(sum7);
+            outDataPtr[o + 8] = vaddvq_f32(sum8);
+            outDataPtr[o + 9] = vaddvq_f32(sum9);
+            outDataPtr[o + 10] = vaddvq_f32(sum10);
+            outDataPtr[o + 11] = vaddvq_f32(sum11);
+            outDataPtr[o + 12] = vaddvq_f32(sum12);
+            outDataPtr[o + 13] = vaddvq_f32(sum13);
+            outDataPtr[o + 14] = vaddvq_f32(sum14);
+            outDataPtr[o + 15] = vaddvq_f32(sum15);
         }
 
-        for (int si = 0; si < 16; ++si)
-            outputPtr[o + si] = vaddvq_f32(sum[si]);
+        for (; o + 4 <= end; o += 4) {
+             float32x4_t sum0 = vdupq_n_f32(0.0f);
+             float32x4_t sum1 = vdupq_n_f32(0.0f);
+             float32x4_t sum2 = vdupq_n_f32(0.0f);
+             float32x4_t sum3 = vdupq_n_f32(0.0f);
+             
+             const float* d_ptr = inDataPtr + o;
+             float32x4_t d_curr = vld1q_f32(d_ptr);
+             
+             for (size_t b = 0; b < k_blocks; ++b) {
+                 float32x4_t d_next = vld1q_f32(d_ptr + (b + 1) * 4);
+                 float32x4_t k = k_vecs_ptr[b];
+                 
+                 sum0 = vfmaq_f32(sum0, d_curr, k);
+                 sum1 = vfmaq_f32(sum1, vextq_f32(d_curr, d_next, 1), k);
+                 sum2 = vfmaq_f32(sum2, vextq_f32(d_curr, d_next, 2), k);
+                 sum3 = vfmaq_f32(sum3, vextq_f32(d_curr, d_next, 3), k);
+                 
+                 d_curr = d_next;
+             }
+             outDataPtr[o + 0] = vaddvq_f32(sum0);
+             outDataPtr[o + 1] = vaddvq_f32(sum1);
+             outDataPtr[o + 2] = vaddvq_f32(sum2);
+             outDataPtr[o + 3] = vaddvq_f32(sum3);
+        }
+
+        for (; o < end; ++o) {
+            float sum = 0.0f;
+            for (size_t k = 0; k < kernelSize; ++k) {
+                sum += inDataPtr[o + k] * convolutionKernel[k];
+            }
+            outDataPtr[o] = sum;
+        }
     });
-
-    size_t o = block16_count * 16;
-    for (; o + 4 <= out_count; o += 4) {
-        float32x4_t sum0 = vdupq_n_f32(0.0f);
-        float32x4_t sum1 = vdupq_n_f32(0.0f);
-        float32x4_t sum2 = vdupq_n_f32(0.0f);
-        float32x4_t sum3 = vdupq_n_f32(0.0f);
-
-        const float* d_ptr = io_ptr + o;
-        float32x4_t d_curr = vld1q_f32(d_ptr);
-
-        for (size_t b = 0; b < k_blocks; ++b) {
-            float32x4_t d_next = vld1q_f32(d_ptr + (b + 1) * 4);
-            float32x4_t k = k_vecs[b];
-
-            float32x4_t d1 = vextq_f32(d_curr, d_next, 1);
-            float32x4_t d2 = vextq_f32(d_curr, d_next, 2);
-            float32x4_t d3 = vextq_f32(d_curr, d_next, 3);
-
-            sum0 = vfmaq_f32(sum0, d_curr, k);
-            sum1 = vfmaq_f32(sum1, d1, k);
-            sum2 = vfmaq_f32(sum2, d2, k);
-            sum3 = vfmaq_f32(sum3, d3, k);
-
-            d_curr = d_next;
-        }
-
-        outputPtr[o]     = vaddvq_f32(sum0);
-        outputPtr[o + 1] = vaddvq_f32(sum1);
-        outputPtr[o + 2] = vaddvq_f32(sum2);
-        outputPtr[o + 3] = vaddvq_f32(sum3);
-    }
-
-    for (; o < out_count; ++o) {
-        float sum = 0.0f;
-        for (size_t k = 0; k < kernelSize; ++k)
-            sum += io_ptr[o + k] * convolutionKernel[k];
-        outputPtr[o] = sum;
-    }
 }
