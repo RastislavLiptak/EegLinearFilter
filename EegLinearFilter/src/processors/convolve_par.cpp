@@ -9,8 +9,6 @@
 #include <dispatch/dispatch.h>
 #include <arm_neon.h>
 
-#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
-
 void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
@@ -102,6 +100,8 @@ void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convoluti
     
     data.swap(outputBuffer);
 }
+
+#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
 void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();

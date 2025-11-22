@@ -10,8 +10,6 @@
 #include <stdexcept>
 #include <arm_neon.h>
 
-#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
-
 void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
@@ -83,6 +81,8 @@ void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convoluti
         dataPtr[outIndex] = sum;
     }
 }
+
+#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
 void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
