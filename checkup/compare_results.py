@@ -5,6 +5,7 @@ import numpy as np
 import csv
 import shutil
 
+GENERATE_CSV = False
 INCLUDE_MATCHING_ROWS = False
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_FOLDER = "checkup/result_comparison"
@@ -13,7 +14,9 @@ TOLERANCE = 1e-5
 def compare_files():
     if os.path.exists(OUTPUT_FOLDER):
         shutil.rmtree(OUTPUT_FOLDER)
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    if GENERATE_CSV:
+        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     
     search_path = os.path.join(DATA_FOLDER, "*.txt")
     files = sorted(glob.glob(search_path))
@@ -54,7 +57,7 @@ def compare_files():
 
         print(f"{name_a:<30} | {name_b:<30} | {similarity_percent:9.2f}% | {mismatches:<12} | {max_diff:.6f}")
         
-        if mismatches > 0:
+        if mismatches > 0 and GENERATE_CSV:
             vec_a_flat = vec_a.flatten()
             vec_b_flat = vec_b.flatten()
             diff_flat = diff.flatten()
