@@ -5,7 +5,7 @@ import numpy as np
 import csv
 import shutil
 
-INCLUDE_MATCHING_ROWS = True
+INCLUDE_MATCHING_ROWS = False
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_FOLDER = "checkup/result_comparison"
 TOLERANCE = 1e-5
