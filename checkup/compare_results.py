@@ -4,8 +4,10 @@ import itertools
 import numpy as np
 import csv
 import shutil
+import matplotlib.pyplot as plt
 
 GENERATE_CSV = False
+GENERATE_PLOTS = False
 INCLUDE_MATCHING_ROWS = False
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_FOLDER = "checkup/result_comparison"
@@ -15,7 +17,7 @@ def compare_files():
     if os.path.exists(OUTPUT_FOLDER):
         shutil.rmtree(OUTPUT_FOLDER)
 
-    if GENERATE_CSV:
+    if GENERATE_CSV or GENERATE_PLOTS:
         os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     
     search_path = os.path.join(DATA_FOLDER, "*.txt")
@@ -49,6 +51,8 @@ def compare_files():
             continue
 
         diff = np.abs(vec_a - vec_b)
+        diff_flat = diff.flatten()
+        
         matches = np.sum(diff < TOLERANCE)
         total_elements = vec_a.size
         mismatches = total_elements - matches
@@ -57,29 +61,48 @@ def compare_files():
 
         print(f"{name_a:<30} | {name_b:<30} | {similarity_percent:9.2f}% | {mismatches:<12} | {max_diff:.6f}")
         
-        if mismatches > 0 and GENERATE_CSV:
-            vec_a_flat = vec_a.flatten()
-            vec_b_flat = vec_b.flatten()
-            diff_flat = diff.flatten()
-            
-            csv_path = os.path.join(OUTPUT_FOLDER, f"comparison_{name_a}_vs_{name_b}.csv")
-            
-            with open(csv_path, 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(['Index', 'Value A', 'Value B', 'Difference'])
+        if mismatches > 0:
+            if GENERATE_PLOTS:
+                plot_path = os.path.join(OUTPUT_FOLDER, f"plot_{name_a}_vs_{name_b}.pdf")
                 
-                if INCLUDE_MATCHING_ROWS:
-                    indices_to_process = range(total_elements)
-                else:
-                    indices_to_process = np.where(diff_flat >= TOLERANCE)[0]
-
-                for idx in indices_to_process:
-                    current_diff = diff_flat[idx]
+                errors_to_plot = diff_flat[diff_flat >= TOLERANCE]
+                
+                if errors_to_plot.size > 0:
+                    plt.figure(figsize=(10, 6))
                     
-                    if current_diff >= TOLERANCE:
-                        writer.writerow([idx, vec_a_flat[idx], vec_b_flat[idx], current_diff])
+                    plt.hist(errors_to_plot, bins=50, color='red', alpha=0.7, log=True)
+                    
+                    plt.title(f"Distribution of Errors > Tolerance ({TOLERANCE})\n{name_a} vs {name_b}")
+                    plt.xlabel("Absolute Difference Magnitude")
+                    plt.ylabel("Count (Log Scale)")
+                    plt.grid(True, which="both", ls="-", alpha=0.5)
+                    
+                    plt.tight_layout()
+                    plt.savefig(plot_path)
+                    plt.close()
+
+            if GENERATE_CSV:
+                vec_a_flat = vec_a.flatten()
+                vec_b_flat = vec_b.flatten()
+                
+                csv_path = os.path.join(OUTPUT_FOLDER, f"comparison_{name_a}_vs_{name_b}.csv")
+                
+                with open(csv_path, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(['Index', 'Value A', 'Value B', 'Difference'])
+                    
+                    if INCLUDE_MATCHING_ROWS:
+                        indices_to_process = range(total_elements)
                     else:
-                        writer.writerow([idx, "-", "-", "-"])
+                        indices_to_process = np.where(diff_flat >= TOLERANCE)[0]
+
+                    for idx in indices_to_process:
+                        current_diff = diff_flat[idx]
+                        
+                        if current_diff >= TOLERANCE:
+                            writer.writerow([idx, vec_a_flat[idx], vec_b_flat[idx], current_diff])
+                        else:
+                            writer.writerow([idx, "-", "-", "-"])
 
 if __name__ == "__main__":
     compare_files()
