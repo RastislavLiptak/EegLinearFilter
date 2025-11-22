@@ -5,7 +5,7 @@ import numpy as np
 import csv
 import shutil
 
-INCLUDE_MATCHING_ROWS = False
+INCLUDE_MATCHING_ROWS = True
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_FOLDER = "checkup/result_comparison"
 TOLERANCE = 1e-5
@@ -65,11 +65,12 @@ def compare_files():
                 writer = csv.writer(csvfile)
                 writer.writerow(['Index', 'Value A', 'Value B', 'Difference'])
                 
-                els_to_save = total_elements
-                if not INCLUDE_MATCHING_ROWS:
-                    els_to_save = mismatches
+                if INCLUDE_MATCHING_ROWS:
+                    indices_to_process = range(total_elements)
+                else:
+                    indices_to_process = np.where(diff_flat >= TOLERANCE)[0]
 
-                for idx in range(els_to_save):
+                for idx in indices_to_process:
                     current_diff = diff_flat[idx]
                     
                     if current_diff >= TOLERANCE:
