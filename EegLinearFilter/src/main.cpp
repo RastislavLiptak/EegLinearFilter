@@ -29,7 +29,7 @@ int main(int argc, const char * argv[]) {
         );
         
         std::string outputFilename = "EegLinearFilter/out/out_" + std::to_string((int)mode) + ".txt";
-        saveData(allData, outputFilename);
+        saveData(allData, outputFilename, convolutionKernel);
         std::cout << "Saved results to: " << outputFilename << std::endl;
         
     } catch (const std::exception& e) {
