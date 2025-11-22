@@ -9,8 +9,6 @@
 #include <dispatch/dispatch.h>
 #include <arm_neon.h>
 
-#include <dispatch/dispatch.h>
-
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
 void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
@@ -29,7 +27,6 @@ void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolution
         for (int j = -n; j <= n; ++j) {
             sum += dataPtr[i + j] * kernelPtr[j + n];
         }
-
         dataPtr[outIndex] = sum;
     });
 }

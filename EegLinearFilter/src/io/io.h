@@ -1,12 +1,12 @@
 //
-//  data_loader.h
+//  io.h
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 18.11.2025.
 //
 
-#ifndef DATA_LOADER_H
-#define DATA_LOADER_H
+#ifndef IO_H
+#define IO_H
 
 #include <vector>
 #include <stdlib.h>
@@ -43,5 +43,6 @@ struct aligned_allocator {
 
 using NeonVector = std::vector<float, aligned_allocator<float, 16>>;
 NeonVector loadEdfData(const char* filePath, const int padding = 0);
+void saveData(const NeonVector& data, const std::string& filepath);
 
-#endif // DATA_LOADER_H
+#endif // IO_H

@@ -9,7 +9,7 @@
 #define PROCESSORS_H
 
 #include <vector>
-#include "../io/data_loader.h"
+#include "../io/io.h"
 
 enum class ProcessingMode {
     CPU_SEQ_NO_VEC=0,        // Sequential processing, no vectorization
