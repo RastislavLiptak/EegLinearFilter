@@ -76,8 +76,11 @@ void convolve_par_no_vec_w_unroll(NeonVector& data, const std::vector<float>& co
 void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
+    
+    NeonVector outputBuffer(dataSize);
 
-    float* __restrict dataPtr = data.data();
+    const float* __restrict dataPtr = data.data();
+    float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
     dispatch_apply(outSize, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t outIndex) {
@@ -89,9 +92,10 @@ void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convoluti
         for (int j = -n; j <= n; ++j) {
             sum += dataPtr[i + j] * kernelPtr[j + n];
         }
-
-        dataPtr[outIndex] = sum;
+        outputPtr[outIndex] = sum;
     });
+    
+    data.swap(outputBuffer);
 }
 
 void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
