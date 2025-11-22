@@ -30,9 +30,9 @@ void convolve_seq_no_vec_w_unroll(NeonVector& data, const std::vector<float>& co
 void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
 
-void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_par_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_no_vec_w_unroll(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
+void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
 
 #endif // PROCESSORS_H

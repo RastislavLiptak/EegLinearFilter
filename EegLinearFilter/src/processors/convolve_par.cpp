@@ -9,11 +9,9 @@
 #include <dispatch/dispatch.h>
 #include <arm_neon.h>
 
-void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
-    
-    NeonVector outputBuffer(dataSize);
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
@@ -30,16 +28,12 @@ void convolve_par_no_vec(NeonVector& data, const std::vector<float>& convolution
         }
         outputPtr[outIndex] = sum;
     });
-    
-    data.swap(outputBuffer);
 }
 
-void convolve_par_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_par_no_vec_w_unroll(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
     
-    NeonVector outputBuffer(dataSize);
-
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
@@ -72,15 +66,11 @@ void convolve_par_no_vec_w_unroll(NeonVector& data, const std::vector<float>& co
 
         outputPtr[outIndex] = sum;
     });
-
-    data.swap(outputBuffer);
 }
 
-void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
-    
-    NeonVector outputBuffer(dataSize);
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
@@ -97,13 +87,11 @@ void convolve_par_auto_vec(NeonVector& data, const std::vector<float>& convoluti
         }
         outputPtr[outIndex] = sum;
     });
-    
-    data.swap(outputBuffer);
 }
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
-void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
 
@@ -119,8 +107,8 @@ void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolu
     for (size_t b = 0; b < k_blocks; ++b)
         k_vecs[b] = vld1q_f32(&paddedKernel[b * 4]);
 
-    float* __restrict io_ptr =
-        static_cast<float*>(ALIGN_HINT(data.data()));
+    float* __restrict io_ptr = static_cast<float*>(ALIGN_HINT(data.data()));
+    float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
 
     const size_t out_count = dataSize - kernelSize + 1;
 
@@ -175,7 +163,7 @@ void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolu
         }
 
         for (int si = 0; si < 16; ++si)
-            io_ptr[o + si] = vaddvq_f32(sum[si]);
+            outputPtr[o + si] = vaddvq_f32(sum[si]);
     });
 
     size_t o = block16_count * 16;
@@ -204,16 +192,16 @@ void convolve_par_manual_vec(NeonVector& data, const std::vector<float>& convolu
             d_curr = d_next;
         }
 
-        io_ptr[o]     = vaddvq_f32(sum0);
-        io_ptr[o + 1] = vaddvq_f32(sum1);
-        io_ptr[o + 2] = vaddvq_f32(sum2);
-        io_ptr[o + 3] = vaddvq_f32(sum3);
+        outputPtr[o]     = vaddvq_f32(sum0);
+        outputPtr[o + 1] = vaddvq_f32(sum1);
+        outputPtr[o + 2] = vaddvq_f32(sum2);
+        outputPtr[o + 3] = vaddvq_f32(sum3);
     }
 
     for (; o < out_count; ++o) {
         float sum = 0.0f;
         for (size_t k = 0; k < kernelSize; ++k)
             sum += io_ptr[o + k] * convolutionKernel[k];
-        io_ptr[o] = sum;
+        outputPtr[o] = sum;
     }
 }
