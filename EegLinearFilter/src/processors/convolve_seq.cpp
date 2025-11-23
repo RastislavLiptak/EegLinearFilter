@@ -10,6 +10,23 @@
 #include <stdexcept>
 #include <arm_neon.h>
 
+void convolve_seq_naive(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
+    const size_t dataSize = data.size();
+    
+    float* __restrict dataPtr = data.data();
+    const float* __restrict kernelPtr = convolutionKernel.data();
+    
+    for (size_t i = n; i < dataSize - n; ++i) {
+        float sum = 0.0f;
+        
+        for (int j = -n; j <= n; ++j) {
+            sum += dataPtr[i + j] * kernelPtr[j + n];
+        }
+        dataPtr[i - n] = sum;
+    }
+}
+
+//TODO - tohle nebude úplně nejefektivnější způsob výpočtu, v paralelním režimu to je vymyšlené líp
 void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
@@ -29,40 +46,7 @@ void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolution
     }
 }
 
-void convolve_seq_no_vec_w_unroll(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
-    const size_t dataSize = data.size();
-
-    float* __restrict dataPtr = data.data();
-    const float* __restrict kernelPtr = convolutionKernel.data();
-
-    size_t outIndex = 0;
-
-    for (size_t i = n; i < dataSize - n; ++i, ++outIndex) {
-        int j = -n;
-        float sum0 = 0.0f;
-        float sum1 = 0.0f;
-        float sum2 = 0.0f;
-        float sum3 = 0.0f;
-        
-        #pragma clang loop vectorize(disable)
-        for (; j <= n - 3; j += 4) {
-            sum0 += dataPtr[i + j] * kernelPtr[j + n];
-            sum1 += dataPtr[i + j + 1] * kernelPtr[j + n + 1];
-            sum2 += dataPtr[i + j + 2] * kernelPtr[j + n + 2];
-            sum3 += dataPtr[i + j + 3] * kernelPtr[j + n + 3];
-        }
-
-        float sum = (sum0 + sum1) + (sum2 + sum3);
-
-        #pragma clang loop vectorize(disable)
-        for (; j <= n; ++j) {
-            sum += dataPtr[i + j] * kernelPtr[j + n];
-        }
-
-        dataPtr[outIndex] = sum;
-    }
-}
-
+//TODO - tohle nebude úplně nejefektivnější způsob výpočtu, v paralelním režimu to je vymyšlené líp
 void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     
@@ -84,6 +68,7 @@ void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convoluti
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
+//TODO - tohle nebude úplně nejefektivnější způsob výpočtu, v paralelním režimu to je vymyšlené líp
 void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();

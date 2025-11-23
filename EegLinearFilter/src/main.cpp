@@ -15,7 +15,7 @@ int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
     const int convolutionKernelRadius = 256;
     const float convolutionKernelSigma = 1.0f;
-    const ProcessingMode mode = ProcessingMode::CPU_PAR_MANUAL_VEC;
+    const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
     
     try {
         const std::vector<float> convolutionKernel = createGaussianKernel(convolutionKernelRadius, convolutionKernelSigma);

@@ -279,6 +279,8 @@
 				"OTHER_CPLUSPLUSFLAGS[arch=*]" = (
 					"-Rpass=loop-vectorize",
 					"-Rpass-missed=loop-vectorize",
+					"-O3",
+					"-ffast-math",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};

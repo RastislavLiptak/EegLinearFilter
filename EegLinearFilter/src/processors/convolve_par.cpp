@@ -12,80 +12,100 @@
 void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
+    const size_t kernelSize = convolutionKernel.size();
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    dispatch_apply(outSize, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t outIndex) {
-        const size_t i = outIndex + n;
+    const size_t chunkSize = 4096;
+    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
 
-        float sum = 0.0f;
+    dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
+        const size_t start = chunkIndex * chunkSize;
+        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
 
-        #pragma clang loop vectorize(disable)
-        for (int j = -n; j <= n; ++j) {
-            sum += dataPtr[i + j] * kernelPtr[j + n];
-        }
-        outputPtr[outIndex] = sum;
-    });
-}
+        float* o_chunk = outputPtr + start;
+        const float* d_chunk = dataPtr + start;
 
-void convolve_par_no_vec_w_unroll(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
-    const size_t dataSize = data.size();
-    const size_t outSize = dataSize - 2 * n;
-    
-    const float* __restrict dataPtr = data.data();
-    float* __restrict outputPtr = outputBuffer.data();
-    const float* __restrict kernelPtr = convolutionKernel.data();
+        size_t k = 0;
 
-    dispatch_apply(outSize, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t outIndex) {
+        for (; k + 4 <= kernelSize; k += 4) {
+            const float k0 = kernelPtr[k];
+            const float k1 = kernelPtr[k+1];
+            const float k2 = kernelPtr[k+2];
+            const float k3 = kernelPtr[k+3];
 
-        const size_t i = outIndex + n;
+            #pragma clang loop vectorize(disable)
+            for (size_t out = 0; out < actualChunkSize; ++out) {
+                float sum = o_chunk[out];
 
-        int j = -n;
+                sum += d_chunk[out + k] * k0;
+                sum += d_chunk[out + k + 1] * k1;
+                sum += d_chunk[out + k + 2] * k2;
+                sum += d_chunk[out + k + 3] * k3;
 
-        float sum0 = 0.0f;
-        float sum1 = 0.0f;
-        float sum2 = 0.0f;
-        float sum3 = 0.0f;
-
-        #pragma clang loop vectorize(disable)
-        for (; j <= n - 3; j += 4) {
-            sum0 += dataPtr[i + j]     * kernelPtr[j + n];
-            sum1 += dataPtr[i + j + 1] * kernelPtr[j + n + 1];
-            sum2 += dataPtr[i + j + 2] * kernelPtr[j + n + 2];
-            sum3 += dataPtr[i + j + 3] * kernelPtr[j + n + 3];
+                o_chunk[out] = sum;
+            }
         }
 
-        float sum = (sum0 + sum1) + (sum2 + sum3);
-
-        #pragma clang loop vectorize(disable)
-        for (; j <= n; ++j) {
-            sum += dataPtr[i + j] * kernelPtr[j + n];
+        for (; k < kernelSize; ++k) {
+            const float kv = kernelPtr[k];
+            
+            #pragma clang loop vectorize(disable)
+            for (size_t out = 0; out < actualChunkSize; ++out) {
+                o_chunk[out] += d_chunk[out + k] * kv;
+            }
         }
-
-        outputPtr[outIndex] = sum;
     });
 }
 
 void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - 2 * n;
+    const size_t kernelSize = convolutionKernel.size();
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    dispatch_apply(outSize, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t outIndex) {
-        const size_t i = outIndex + n;
+    const size_t chunkSize = 4096;
+    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
 
-        float sum = 0.0f;
+    dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
+        const size_t start = chunkIndex * chunkSize;
+        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
 
-        #pragma clang loop vectorize(enable)
-        for (int j = -n; j <= n; ++j) {
-            sum += dataPtr[i + j] * kernelPtr[j + n];
+        float* o_chunk = outputPtr + start;
+        const float* d_chunk = dataPtr + start;
+
+        size_t k = 0;
+        for (; k + 4 <= kernelSize; k += 4) {
+            const float k0 = kernelPtr[k];
+            const float k1 = kernelPtr[k+1];
+            const float k2 = kernelPtr[k+2];
+            const float k3 = kernelPtr[k+3];
+
+            #pragma clang loop vectorize(enable) interleave(enable)
+            for (size_t out = 0; out < actualChunkSize; ++out) {
+                float sum = o_chunk[out];
+                
+                sum += d_chunk[out + k] * k0;
+                sum += d_chunk[out + k + 1] * k1;
+                sum += d_chunk[out + k + 2] * k2;
+                sum += d_chunk[out + k + 3] * k3;
+                
+                o_chunk[out] = sum;
+            }
         }
-        outputPtr[outIndex] = sum;
+
+        for (; k < kernelSize; ++k) {
+            const float kv = kernelPtr[k];
+            #pragma clang loop vectorize(enable)
+            for (size_t out = 0; out < actualChunkSize; ++out) {
+                o_chunk[out] += d_chunk[out + k] * kv;
+            }
+        }
     });
 }
 
@@ -94,138 +114,92 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
 void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
     const size_t kernelSize = convolutionKernel.size();
-
     const size_t outSize = dataSize - kernelSize + 1;
 
-    const size_t paddedKernelSize = (kernelSize + 3) & ~3;
-    std::vector<float> paddedKernel(paddedKernelSize, 0.0f);
-    std::memcpy(paddedKernel.data(), convolutionKernel.data(), kernelSize * sizeof(float));
+    const float* __restrict dataPtr = static_cast<float*>(ALIGN_HINT(data.data()));
+    float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
+    const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t k_blocks = paddedKernelSize / 4;
-    std::vector<float32x4_t> k_vecs(k_blocks);
-    for (size_t b = 0; b < k_blocks; ++b) {
-        k_vecs[b] = vld1q_f32(&paddedKernel[b * 4]);
-    }
-
-    const float* __restrict inDataPtr = data.data();
-    float* __restrict outDataPtr = outputBuffer.data();
-    const float32x4_t* k_vecs_ptr = k_vecs.data();
-
-    const size_t CHUNK_SIZE = 16384;
+    const size_t CHUNK_SIZE = 4096;
     const size_t numChunks = (outSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
+        const size_t start = chunkIndex * CHUNK_SIZE;
+        const size_t actualChunkSize = std::min(CHUNK_SIZE, outSize - start);
         
-        size_t o = chunkIndex * CHUNK_SIZE;
-        const size_t end = std::min(o + CHUNK_SIZE, outSize);
+        float* o_chunk = outputPtr + start;
+        const float* d_chunk = dataPtr + start;
 
-        for (; o + 16 <= end; o += 16) {
-            float32x4_t sum0 = vdupq_n_f32(0.0f);
-            float32x4_t sum1 = vdupq_n_f32(0.0f);
-            float32x4_t sum2 = vdupq_n_f32(0.0f);
-            float32x4_t sum3 = vdupq_n_f32(0.0f);
-            float32x4_t sum4 = vdupq_n_f32(0.0f);
-            float32x4_t sum5 = vdupq_n_f32(0.0f);
-            float32x4_t sum6 = vdupq_n_f32(0.0f);
-            float32x4_t sum7 = vdupq_n_f32(0.0f);
-            float32x4_t sum8 = vdupq_n_f32(0.0f);
-            float32x4_t sum9 = vdupq_n_f32(0.0f);
-            float32x4_t sum10 = vdupq_n_f32(0.0f);
-            float32x4_t sum11 = vdupq_n_f32(0.0f);
-            float32x4_t sum12 = vdupq_n_f32(0.0f);
-            float32x4_t sum13 = vdupq_n_f32(0.0f);
-            float32x4_t sum14 = vdupq_n_f32(0.0f);
-            float32x4_t sum15 = vdupq_n_f32(0.0f);
+        size_t k = 0;
+        for (; k + 4 <= kernelSize; k += 4) {
+            float32x4_t k0 = vdupq_n_f32(kernelPtr[k]);
+            float32x4_t k1 = vdupq_n_f32(kernelPtr[k + 1]);
+            float32x4_t k2 = vdupq_n_f32(kernelPtr[k + 2]);
+            float32x4_t k3 = vdupq_n_f32(kernelPtr[k + 3]);
 
-            const float* d_ptr = inDataPtr + o;
+            size_t i = 0;
+            
+            for (; i + 8 <= actualChunkSize; i += 8) {
+                float32x4_t acc0 = vld1q_f32(o_chunk + i);
+                float32x4_t acc1 = vld1q_f32(o_chunk + i + 4);
 
-            float32x4_t d0 = vld1q_f32(d_ptr);
-            float32x4_t d1 = vld1q_f32(d_ptr + 4);
-            float32x4_t d2 = vld1q_f32(d_ptr + 8);
-            float32x4_t d3 = vld1q_f32(d_ptr + 12);
-            float32x4_t d4;
+                float32x4_t d0_0 = vld1q_f32(d_chunk + i + k);
+                float32x4_t d1_0 = vld1q_f32(d_chunk + i + k + 4);
+                acc0 = vfmaq_f32(acc0, d0_0, k0);
+                acc1 = vfmaq_f32(acc1, d1_0, k0);
 
-            for (size_t b = 0; b < k_blocks; ++b) {
-                const float32x4_t k = k_vecs_ptr[b];
+                float32x4_t d0_1 = vld1q_f32(d_chunk + i + k + 1);
+                float32x4_t d1_1 = vld1q_f32(d_chunk + i + k + 5);
+                acc0 = vfmaq_f32(acc0, d0_1, k1);
+                acc1 = vfmaq_f32(acc1, d1_1, k1);
 
-                d4 = vld1q_f32(d_ptr + (b + 4) * 4);
+                float32x4_t d0_2 = vld1q_f32(d_chunk + i + k + 2);
+                float32x4_t d1_2 = vld1q_f32(d_chunk + i + k + 6);
+                acc0 = vfmaq_f32(acc0, d0_2, k2);
+                acc1 = vfmaq_f32(acc1, d1_2, k2);
 
-                sum0 = vfmaq_f32(sum0, d0, k);
-                sum1 = vfmaq_f32(sum1, vextq_f32(d0, d1, 1), k);
-                sum2 = vfmaq_f32(sum2, vextq_f32(d0, d1, 2), k);
-                sum3 = vfmaq_f32(sum3, vextq_f32(d0, d1, 3), k);
+                float32x4_t d0_3 = vld1q_f32(d_chunk + i + k + 3);
+                float32x4_t d1_3 = vld1q_f32(d_chunk + i + k + 7);
+                acc0 = vfmaq_f32(acc0, d0_3, k3);
+                acc1 = vfmaq_f32(acc1, d1_3, k3);
 
-                sum4 = vfmaq_f32(sum4, d1, k);
-                sum5 = vfmaq_f32(sum5, vextq_f32(d1, d2, 1), k);
-                sum6 = vfmaq_f32(sum6, vextq_f32(d1, d2, 2), k);
-                sum7 = vfmaq_f32(sum7, vextq_f32(d1, d2, 3), k);
-
-                sum8 = vfmaq_f32(sum8, d2, k);
-                sum9 = vfmaq_f32(sum9, vextq_f32(d2, d3, 1), k);
-                sum10 = vfmaq_f32(sum10, vextq_f32(d2, d3, 2), k);
-                sum11 = vfmaq_f32(sum11, vextq_f32(d2, d3, 3), k);
-
-                sum12 = vfmaq_f32(sum12, d3, k);
-                sum13 = vfmaq_f32(sum13, vextq_f32(d3, d4, 1), k);
-                sum14 = vfmaq_f32(sum14, vextq_f32(d3, d4, 2), k);
-                sum15 = vfmaq_f32(sum15, vextq_f32(d3, d4, 3), k);
-
-                d0 = d1;
-                d1 = d2;
-                d2 = d3;
-                d3 = d4;
+                vst1q_f32(o_chunk + i, acc0);
+                vst1q_f32(o_chunk + i + 4, acc1);
             }
 
-            outDataPtr[o + 0] = vaddvq_f32(sum0);
-            outDataPtr[o + 1] = vaddvq_f32(sum1);
-            outDataPtr[o + 2] = vaddvq_f32(sum2);
-            outDataPtr[o + 3] = vaddvq_f32(sum3);
-            outDataPtr[o + 4] = vaddvq_f32(sum4);
-            outDataPtr[o + 5] = vaddvq_f32(sum5);
-            outDataPtr[o + 6] = vaddvq_f32(sum6);
-            outDataPtr[o + 7] = vaddvq_f32(sum7);
-            outDataPtr[o + 8] = vaddvq_f32(sum8);
-            outDataPtr[o + 9] = vaddvq_f32(sum9);
-            outDataPtr[o + 10] = vaddvq_f32(sum10);
-            outDataPtr[o + 11] = vaddvq_f32(sum11);
-            outDataPtr[o + 12] = vaddvq_f32(sum12);
-            outDataPtr[o + 13] = vaddvq_f32(sum13);
-            outDataPtr[o + 14] = vaddvq_f32(sum14);
-            outDataPtr[o + 15] = vaddvq_f32(sum15);
-        }
-
-        for (; o + 4 <= end; o += 4) {
-             float32x4_t sum0 = vdupq_n_f32(0.0f);
-             float32x4_t sum1 = vdupq_n_f32(0.0f);
-             float32x4_t sum2 = vdupq_n_f32(0.0f);
-             float32x4_t sum3 = vdupq_n_f32(0.0f);
-             
-             const float* d_ptr = inDataPtr + o;
-             float32x4_t d_curr = vld1q_f32(d_ptr);
-             
-             for (size_t b = 0; b < k_blocks; ++b) {
-                 float32x4_t d_next = vld1q_f32(d_ptr + (b + 1) * 4);
-                 float32x4_t k = k_vecs_ptr[b];
-                 
-                 sum0 = vfmaq_f32(sum0, d_curr, k);
-                 sum1 = vfmaq_f32(sum1, vextq_f32(d_curr, d_next, 1), k);
-                 sum2 = vfmaq_f32(sum2, vextq_f32(d_curr, d_next, 2), k);
-                 sum3 = vfmaq_f32(sum3, vextq_f32(d_curr, d_next, 3), k);
-                 
-                 d_curr = d_next;
-             }
-             outDataPtr[o + 0] = vaddvq_f32(sum0);
-             outDataPtr[o + 1] = vaddvq_f32(sum1);
-             outDataPtr[o + 2] = vaddvq_f32(sum2);
-             outDataPtr[o + 3] = vaddvq_f32(sum3);
-        }
-
-        for (; o < end; ++o) {
-            float sum = 0.0f;
-            for (size_t k = 0; k < kernelSize; ++k) {
-                sum += inDataPtr[o + k] * convolutionKernel[k];
+            for (; i + 4 <= actualChunkSize; i += 4) {
+                float32x4_t acc = vld1q_f32(o_chunk + i);
+                
+                acc = vfmaq_f32(acc, vld1q_f32(d_chunk + i + k),     k0);
+                acc = vfmaq_f32(acc, vld1q_f32(d_chunk + i + k + 1), k1);
+                acc = vfmaq_f32(acc, vld1q_f32(d_chunk + i + k + 2), k2);
+                acc = vfmaq_f32(acc, vld1q_f32(d_chunk + i + k + 3), k3);
+                
+                vst1q_f32(o_chunk + i, acc);
             }
-            outDataPtr[o] = sum;
+
+            for (; i < actualChunkSize; ++i) {
+                o_chunk[i] += d_chunk[i + k]     * kernelPtr[k];
+                o_chunk[i] += d_chunk[i + k + 1] * kernelPtr[k + 1];
+                o_chunk[i] += d_chunk[i + k + 2] * kernelPtr[k + 2];
+                o_chunk[i] += d_chunk[i + k + 3] * kernelPtr[k + 3];
+            }
+        }
+
+        for (; k < kernelSize; ++k) {
+            float kv_scalar = kernelPtr[k];
+            float32x4_t k_vec = vdupq_n_f32(kv_scalar);
+            
+            size_t i = 0;
+            for (; i + 4 <= actualChunkSize; i += 4) {
+                float32x4_t o = vld1q_f32(o_chunk + i);
+                float32x4_t d = vld1q_f32(d_chunk + i + k);
+                o = vfmaq_f32(o, d, k_vec);
+                vst1q_f32(o_chunk + i, o);
+            }
+            for (; i < actualChunkSize; ++i) {
+                o_chunk[i] += d_chunk[i + k] * kv_scalar;
+            }
         }
     });
 }
