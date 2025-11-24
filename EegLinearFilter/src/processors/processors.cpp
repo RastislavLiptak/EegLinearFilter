@@ -9,6 +9,21 @@
 #include <iostream>
 #include <chrono>
 
+void calcBenchmarks(const std::chrono::duration<double> elapsed, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    const size_t kernelSize = convolutionKernel.size();
+    const size_t outputElements = outputBuffer.size() - kernelSize + 1;
+
+    double megaSamplesPerSec = (outputElements / elapsed.count()) / 1e6;
+
+    double totalOperations = (double)outputElements * (double)kernelSize * 2.0;
+    double gigaFlops = (totalOperations / elapsed.count()) / 1e9;
+
+    std::cout << "Computation time: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << "Throughput: " << megaSamplesPerSec << " MSamples/s" << std::endl;
+    std::cout << "Computational: " << gigaFlops << " GFLOPS" << std::endl;
+    std::cout << "----------------------------------------\n";
+}
+
 //TODO - velikost jádra je známá už při kompilaci, na to by bylo super, aby byl program ready
 
 void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius) {
@@ -51,8 +66,8 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> elapsed = end - start;
-    std::cout << "Computation time: " << elapsed.count() << " seconds" << std::endl;
-    std::cout << "----------------------------------------\n";
     
     allData.swap(outputBuffer);
+    
+    calcBenchmarks(elapsed, outputBuffer, convolutionKernel);
 }

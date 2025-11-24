@@ -12,8 +12,8 @@
 
 void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
-    const size_t outSize = dataSize - 2 * n;
     const size_t kernelSize = convolutionKernel.size();
+    const size_t outSize = dataSize - kernelSize + 1;
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
@@ -61,8 +61,8 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
 
 void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n) {
     const size_t dataSize = data.size();
-    const size_t outSize = dataSize - 2 * n;
     const size_t kernelSize = convolutionKernel.size();
+    const size_t outSize = dataSize - kernelSize + 1;
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();

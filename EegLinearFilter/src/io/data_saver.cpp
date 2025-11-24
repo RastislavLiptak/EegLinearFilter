@@ -28,7 +28,7 @@ void saveData(const NeonVector& data, const std::string& filepath, const std::ve
     }
 
     size_t totalSize = data.size();
-    size_t limit = totalSize - convolutionKernelSize;
+    size_t limit = totalSize - convolutionKernelSize + 1;
 
     for (size_t i = 0; i < limit; ++i) {
         file << data[i] << "\n";
