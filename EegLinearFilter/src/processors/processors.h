@@ -12,7 +12,6 @@
 #include "../io/io.h"
 
 enum class ProcessingMode {
-    CPU_SEQ_NAIVE=0,         // Naive implementation without optimizations
     CPU_SEQ_NO_VEC,          // Sequential processing, no vectorization
     CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
     CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
@@ -24,11 +23,9 @@ enum class ProcessingMode {
 
 void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius);
 
-void convolve_seq_naive(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-
-void convolve_seq_no_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_seq_auto_vec(NeonVector& data, const std::vector<float>& convolutionKernel, const int n);
-void convolve_seq_manual_vec(NeonVector& data, const std::vector<float>& convolutionKernel);
+void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
+void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel);
 
 void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);
 void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int n);

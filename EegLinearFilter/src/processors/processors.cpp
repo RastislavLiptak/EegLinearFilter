@@ -13,34 +13,21 @@
 
 void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius) {
     
-    bool needOutputBuffer = false;
-    NeonVector outputBuffer;
-    if (mode == ProcessingMode::CPU_PAR_NO_VEC ||
-        mode == ProcessingMode::CPU_PAR_AUTO_VEC ||
-        mode == ProcessingMode::CPU_PAR_MANUAL_VEC)
-    {
-        needOutputBuffer = true;
-        outputBuffer.resize(allData.size());
-    }
-    
+    NeonVector outputBuffer(allData.size());
     const auto start = std::chrono::high_resolution_clock::now();
     
     switch (mode) {
-        case ProcessingMode::CPU_SEQ_NAIVE:
-            std::cout << "Mode: Naive processing on CPU" << std::endl;
-            convolve_seq_naive(allData, convolutionKernel, convolutionKernelRadius);
-            break;
         case ProcessingMode::CPU_SEQ_NO_VEC:
             std::cout << "Mode: Sequential processing on CPU (no-vectorization)" << std::endl;
-            convolve_seq_no_vec(allData, convolutionKernel, convolutionKernelRadius);
+            convolve_seq_no_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
             break;
         case ProcessingMode::CPU_SEQ_AUTO_VEC:
             std::cout << "Mode: Sequential processing on CPU (auto-vectorization)" << std::endl;
-            convolve_seq_auto_vec(allData, convolutionKernel, convolutionKernelRadius);
+            convolve_seq_auto_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
             break;
         case ProcessingMode::CPU_SEQ_MANUAL_VEC:
             std::cout << "Mode: Sequential processing on CPU (manual-vectorization)" << std::endl;
-            convolve_seq_manual_vec(allData, convolutionKernel);
+            convolve_seq_manual_vec(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
             std::cout << "Mode: Parallel processing on CPU (no-vectorization)" << std::endl;
@@ -67,7 +54,5 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     std::cout << "Computation time: " << elapsed.count() << " seconds" << std::endl;
     std::cout << "----------------------------------------\n";
     
-    if (needOutputBuffer) {
-        allData.swap(outputBuffer);
-    }
+    allData.swap(outputBuffer);
 }

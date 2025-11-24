@@ -120,12 +120,12 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
     float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t CHUNK_SIZE = 4096;
-    const size_t numChunks = (outSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    const size_t chunkSize = 4096;
+    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
 
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
-        const size_t start = chunkIndex * CHUNK_SIZE;
-        const size_t actualChunkSize = std::min(CHUNK_SIZE, outSize - start);
+        const size_t start = chunkIndex * chunkSize;
+        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
         
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
