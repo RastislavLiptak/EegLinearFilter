@@ -18,8 +18,8 @@ int main(int argc, const char * argv[]) {
     const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
     
     try {
-        const std::vector<float> convolutionKernel = createGaussianKernel(convolutionKernelRadius, convolutionKernelSigma);
-        NeonVector allData = loadEdfData(filePath, convolutionKernelRadius);
+        const std::vector<float> convolutionKernel = create_gaussian_kernel(convolutionKernelRadius, convolutionKernelSigma);
+        NeonVector allData = load_edf_data(filePath, convolutionKernelRadius);
         
         run_processor(
             mode,
@@ -29,7 +29,7 @@ int main(int argc, const char * argv[]) {
         );
         
         std::string outputFilename = "EegLinearFilter/out/out_" + std::to_string((int)mode) + ".txt";
-        saveData(allData, outputFilename, convolutionKernel);
+        save_data(allData, outputFilename, convolutionKernel);
         std::cout << "Saved results to: " << outputFilename << std::endl;
         
     } catch (const std::exception& e) {

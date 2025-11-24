@@ -11,7 +11,7 @@
 #include <iostream>
 #include <filesystem>
 
-void saveData(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel) {
+void save_data(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel) {
     const size_t convolutionKernelSize = convolutionKernel.size();
     
     std::filesystem::path pathObj(filepath);

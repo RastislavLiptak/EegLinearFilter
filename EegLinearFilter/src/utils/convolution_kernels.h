@@ -10,6 +10,6 @@
 
 #include <vector>
 
-std::vector<float> createGaussianKernel(const int radius, const float sigma);
+std::vector<float> create_gaussian_kernel(const int radius, const float sigma);
 
 #endif // CONVOLUTION_KERNELS_H

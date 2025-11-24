@@ -42,7 +42,7 @@ struct aligned_allocator {
 };
 
 using NeonVector = std::vector<float, aligned_allocator<float, 16>>;
-NeonVector loadEdfData(const char* filePath, const int padding = 0);
-void saveData(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel);
+NeonVector load_edf_data(const char* filePath, const int padding = 0);
+void save_data(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel);
 
 #endif // IO_H

@@ -13,7 +13,7 @@
 #include <string>
 #include <algorithm>
 
-void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& samplesToRead) {
+void validate_edf_header(const edflib_hdr_t& hdr, size_t& totalSamples, int& samplesToRead) {
     const int totalSignals = hdr.edfsignals;
     if (totalSignals <= 0) {
         throw std::runtime_error("No signals found in EDF header");
@@ -38,7 +38,7 @@ void validateEdfHeader(const edflib_hdr_t& hdr, size_t& totalSamples, int& sampl
     totalSamples = static_cast<size_t>(totalSamplesU64);
 }
 
-NeonVector loadEdfData(const char* filePath, const int padding) {
+NeonVector load_edf_data(const char* filePath, const int padding) {
     edflib_hdr_t hdr;
 
     if (padding < 0) {
@@ -58,7 +58,7 @@ NeonVector loadEdfData(const char* filePath, const int padding) {
 
     size_t rawTotalSamples = 0;
     int samplesPerSignal = 0;
-    validateEdfHeader(hdr, rawTotalSamples, samplesPerSignal);
+    validate_edf_header(hdr, rawTotalSamples, samplesPerSignal);
 
     const int totalSignals = hdr.edfsignals;
 

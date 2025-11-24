@@ -9,7 +9,7 @@
 #include <iostream>
 #include <chrono>
 
-void calcBenchmarks(const std::chrono::duration<double> elapsed, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void calc_benchmarks(const std::chrono::duration<double> elapsed, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t kernelSize = convolutionKernel.size();
     const size_t outputElements = outputBuffer.size() - kernelSize + 1;
 
@@ -69,5 +69,5 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     allData.swap(outputBuffer);
     
-    calcBenchmarks(elapsed, outputBuffer, convolutionKernel);
+    calc_benchmarks(elapsed, outputBuffer, convolutionKernel);
 }
