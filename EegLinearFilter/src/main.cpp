@@ -7,25 +7,25 @@
 
 #include <iostream>
 #include <vector>
-#include "io/io.h"
-#include "utils/convolution_kernels.h"
-#include "processors/processors.h"
+#include "io/io.hpp"
+#include "convolution_kernels.hpp"
+#include "processors/processors.hpp"
+
+constexpr int KERNEL_RADIUS = 256;
+constexpr float KERNEL_SIGMA = 1.0f;
 
 int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
-    const int convolutionKernelRadius = 256;
-    const float convolutionKernelSigma = 1.0f;
-    const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
+    const ProcessingMode mode = ProcessingMode::CPU_PAR_MANUAL_VEC;
     
     try {
-        const std::vector<float> convolutionKernel = create_gaussian_kernel(convolutionKernelRadius, convolutionKernelSigma);
-        NeonVector allData = load_edf_data(filePath, convolutionKernelRadius);
+        const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
+        NeonVector allData = load_edf_data(filePath, KERNEL_RADIUS);
         
-        run_processor(
+        run_processor<KERNEL_RADIUS>(
             mode,
             allData,
-            convolutionKernel,
-            convolutionKernelRadius
+            convolutionKernel
         );
         
         std::string outputFilename = "EegLinearFilter/out/out_" + std::to_string((int)mode) + ".txt";

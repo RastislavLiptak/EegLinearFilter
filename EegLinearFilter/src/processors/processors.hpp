@@ -1,21 +1,37 @@
 //
-//  processors.cpp
+//  processors.hpp
 //  EegLinearFilter
 //
-//  Created by Rastislav Lipták on 20.11.2025.
+//  Created by Rastislav Lipták on 19.11.2025.
 //
 
-#include "processors.h"
+#ifndef PROCESSORS_HPP
+#define PROCESSORS_HPP
+
+
+#include "convolve_par.hpp"
+#include "convolve_seq.hpp"
 #include <iostream>
 #include <chrono>
 
-void calc_benchmarks(const std::chrono::duration<double> elapsed, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
-    const size_t kernelSize = convolutionKernel.size();
-    const size_t outputElements = outputBuffer.size() - kernelSize + 1;
+enum class ProcessingMode {
+    CPU_SEQ_NO_VEC,          // Sequential processing, no vectorization
+    CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
+    CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
+    CPU_PAR_NO_VEC,          // Parallel, no vectorization
+    CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
+    CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
+    GPU_PAR                  // GPU-accelerated
+};
+
+template <int Radius>
+void calc_benchmarks(const std::chrono::duration<double> elapsed, size_t dataSize) {
+    constexpr size_t KernelSize = 2 * Radius + 1;
+    const size_t outputElements = dataSize - KernelSize + 1;
 
     double megaSamplesPerSec = (outputElements / elapsed.count()) / 1e6;
 
-    double totalOperations = (double)outputElements * (double)kernelSize * 2.0;
+    double totalOperations = (double)outputElements * (double)KernelSize * 2.0;
     double gigaFlops = (totalOperations / elapsed.count()) / 1e9;
 
     std::cout << "Computation time: " << elapsed.count() << " seconds" << std::endl;
@@ -24,37 +40,36 @@ void calc_benchmarks(const std::chrono::duration<double> elapsed, NeonVector& ou
     std::cout << "----------------------------------------\n";
 }
 
-//TODO - velikost jádra je známá už při kompilaci, na to by bylo super, aby byl program ready
-
-void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const int convolutionKernelRadius) {
+template <int Radius>
+void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
     
-    NeonVector outputBuffer(allData.size());
+    NeonVector outputBuffer(allData.size(), 0.0f);
     const auto start = std::chrono::high_resolution_clock::now();
     
     switch (mode) {
         case ProcessingMode::CPU_SEQ_NO_VEC:
             std::cout << "Mode: Sequential processing on CPU (no-vectorization)" << std::endl;
-            convolve_seq_no_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
+            convolve_seq_no_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_AUTO_VEC:
             std::cout << "Mode: Sequential processing on CPU (auto-vectorization)" << std::endl;
-            convolve_seq_auto_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
+            convolve_seq_auto_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_MANUAL_VEC:
             std::cout << "Mode: Sequential processing on CPU (manual-vectorization)" << std::endl;
-            convolve_seq_manual_vec(allData, outputBuffer, convolutionKernel);
+            convolve_seq_manual_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
             std::cout << "Mode: Parallel processing on CPU (no-vectorization)" << std::endl;
-            convolve_par_no_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
+            convolve_par_no_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_AUTO_VEC:
             std::cout << "Mode: Parallel processing on CPU (auto-vectorization)" << std::endl;
-            convolve_par_auto_vec(allData, outputBuffer, convolutionKernel, convolutionKernelRadius);
+            convolve_par_auto_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_MANUAL_VEC:
             std::cout << "Mode: Parallel processing on CPU (manual-vectorization)" << std::endl;
-            convolve_par_manual_vec(allData, outputBuffer, convolutionKernel);
+            convolve_par_manual_vec<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::GPU_PAR:
             std::cout << "Mode: GPU processing" << std::endl;
@@ -69,5 +84,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     allData.swap(outputBuffer);
     
-    calc_benchmarks(elapsed, outputBuffer, convolutionKernel);
+    calc_benchmarks<Radius>(elapsed, allData.size());
 }
+
+#endif // PROCESSORS_HPP

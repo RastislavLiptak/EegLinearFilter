@@ -1,32 +1,34 @@
 //
-//  convolution_kernels.cpp
+//  convolution_kernels.hpp
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 19.11.2025.
 //
 
-#include "convolution_kernels.h"
+#ifndef CONVOLUTION_KERNELS_HPP
+#define CONVOLUTION_KERNELS_HPP
+
+#include <vector>
 #include <cmath>
 #include <iostream>
 
-std::vector<float> create_gaussian_kernel(const int radius, const float sigma) {
-    if (radius < 0) {
-        throw std::runtime_error("Gaussian kernel radius cannot be negative");
-    }
+template <int Radius>
+std::vector<float> create_gaussian_kernel(const float sigma) {
+    static_assert(Radius >= 0, "Gaussian kernel radius cannot be negative");
     if (sigma <= 0.0f) {
         throw std::runtime_error("Gaussian kernel sigma must be positive");
     }
     
     std::cout << "Generating a convolution kernel..."<< std::endl;
     
-    const int size = 2 * radius + 1;
+    constexpr size_t size = 2 * Radius + 1;
     std::vector<float> kernel(size);
     
     float sum = 0.0f;
     
     const float denominator = 2.0f * sigma * sigma;
     for (int i = 0; i < size; ++i) {
-        int x = i - radius;
+        int x = i - Radius;
         kernel[i] = std::exp(-(x * x) / denominator);
         sum += kernel[i];
     }
@@ -36,9 +38,11 @@ std::vector<float> create_gaussian_kernel(const int radius, const float sigma) {
     }
     
     std::cout << "Size: " << size << " | ";
-    std::cout << "Radius: " << radius << " | ";
+    std::cout << "Radius: " << Radius << " | ";
     std::cout << "Sigma: " << sigma << "\n";
     std::cout << "----------------------------------------" << std::endl;
     
     return kernel;
 }
+
+#endif // CONVOLUTION_KERNELS_HPP

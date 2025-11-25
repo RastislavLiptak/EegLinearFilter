@@ -5,7 +5,7 @@
 //  Created by Rastislav Lipták on 18.11.2025.
 //
 
-#include "io.h"
+#include "io.hpp"
 #include <iostream>
 #include <iomanip>
 #include <limits>

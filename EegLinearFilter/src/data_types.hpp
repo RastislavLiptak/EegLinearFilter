@@ -1,17 +1,17 @@
 //
-//  io.h
+//  data_types.hpp
 //  EegLinearFilter
 //
-//  Created by Rastislav Lipták on 18.11.2025.
+//  Created by Rastislav Lipták on 25.11.2025.
 //
 
-#ifndef IO_H
-#define IO_H
+#ifndef DATA_TYPES_HPP
+#define DATA_TYPES_HPP
 
-#include <vector>
 #include <stdlib.h>
 #include <new>
-#include "../../lib/edflib/edflib.h"
+#include <vector>
+#include <cstddef>
 
 template <typename T, std::size_t Alignment>
 struct aligned_allocator {
@@ -42,7 +42,5 @@ struct aligned_allocator {
 };
 
 using NeonVector = std::vector<float, aligned_allocator<float, 16>>;
-NeonVector load_edf_data(const char* filePath, const int padding = 0);
-void save_data(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel);
 
-#endif // IO_H
+#endif // DATA_TYPES_HPP
