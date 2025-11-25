@@ -16,9 +16,11 @@
 
 enum class ProcessingMode {
     CPU_SEQ_APPLE,           // Sequential benchmark implementation using Apple vDSP_conv method
+    CPU_SEQ_NAIVE,           // Sequential naive approach without optimization
     CPU_SEQ_NO_VEC,          // Sequential processing, no vectorization
     CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
     CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
+    CPU_PAR_NAIVE,           // Parallel naive approach without optimization
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
     CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
     CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
@@ -52,6 +54,10 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
             std::cout << "Mode: Sequential processing on CPU using Apple implementation" << std::endl;
             convolve_seq_apple<Radius>(allData, outputBuffer, convolutionKernel);
             break;
+        case ProcessingMode::CPU_SEQ_NAIVE:
+            std::cout << "Mode: Sequential processing on CPU using naive implementation" << std::endl;
+            convolve_seq_naive<Radius>(allData, outputBuffer, convolutionKernel);
+            break;
         case ProcessingMode::CPU_SEQ_NO_VEC:
             std::cout << "Mode: Sequential processing on CPU (no-vectorization)" << std::endl;
             convolve_seq_no_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
@@ -63,6 +69,10 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
         case ProcessingMode::CPU_SEQ_MANUAL_VEC:
             std::cout << "Mode: Sequential processing on CPU (manual-vectorization)" << std::endl;
             convolve_seq_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            break;
+        case ProcessingMode::CPU_PAR_NAIVE:
+            std::cout << "Mode: Parallel processing on CPU using naive implementation" << std::endl;
+            convolve_par_naive<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
             std::cout << "Mode: Parallel processing on CPU (no-vectorization)" << std::endl;

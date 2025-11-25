@@ -24,6 +24,19 @@ void convolve_seq_apple(NeonVector& data, NeonVector& outputBuffer, const std::v
     vDSP_conv(data.data(), 1, convolutionKernel.data(), 1, outputBuffer.data(), 1, outSize, KernelSize);
 }
 
+template <int Radius>
+void convolve_seq_naive(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    const size_t dataSize = data.size();
+    
+    for (size_t i = static_cast<size_t>(Radius); i < dataSize - static_cast<size_t>(Radius); ++i) {
+        float sum = 0.0f;
+        for (int j = -Radius; j <= Radius; ++j) {
+            sum += data[i + j] * convolutionKernel[j + Radius];
+        }
+        outputBuffer[i - Radius] = sum;
+    }
+}
+
 template <int Radius, int ChunkSize>
 void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;

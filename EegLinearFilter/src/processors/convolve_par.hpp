@@ -16,6 +16,29 @@
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
 template <int Radius, int ChunkSize>
+void convolve_par_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    const size_t dataSize = data.size();
+    const size_t start = static_cast<size_t>(Radius);
+    const size_t end = dataSize - static_cast<size_t>(Radius);
+    const size_t totalWork = end - start;
+
+    const size_t numChunks = (totalWork + ChunkSize - 1) / ChunkSize;
+
+    dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIdx) {
+        size_t chunkStart = start + chunkIdx * ChunkSize;
+        size_t chunkEnd = std::min(chunkStart + ChunkSize, end);
+
+        for (size_t i = chunkStart; i < chunkEnd; ++i) {
+            float sum = 0.0f;
+            for (int j = -Radius; j <= Radius; ++j) {
+                sum += data[i + j] * convolutionKernel[j + Radius];
+            }
+            outputBuffer[i - Radius] = sum;
+        }
+    });
+}
+
+template <int Radius, int ChunkSize>
 void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
