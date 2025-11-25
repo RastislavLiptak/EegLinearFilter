@@ -24,7 +24,7 @@ void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
-    
+
     const size_t numChunks = (outSize + ChunkSize - 1) / ChunkSize;
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
         const size_t start = chunkIndex * ChunkSize;
@@ -34,29 +34,35 @@ void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
         const float* d_chunk = dataPtr + start;
 
         size_t k = 0;
-
-        for (; k + 4 <= KernelSize; k += 4) {
+        for (; k + 8 <= KernelSize; k += 8) {
             const float k0 = kernelPtr[k];
             const float k1 = kernelPtr[k+1];
             const float k2 = kernelPtr[k+2];
             const float k3 = kernelPtr[k+3];
+            const float k4 = kernelPtr[k+4];
+            const float k5 = kernelPtr[k+5];
+            const float k6 = kernelPtr[k+6];
+            const float k7 = kernelPtr[k+7];
 
             #pragma clang loop vectorize(disable)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 float sum = o_chunk[out];
-
-                sum += d_chunk[out + k] * k0;
+                
+                sum += d_chunk[out + k + 0] * k0;
                 sum += d_chunk[out + k + 1] * k1;
                 sum += d_chunk[out + k + 2] * k2;
                 sum += d_chunk[out + k + 3] * k3;
-
+                sum += d_chunk[out + k + 4] * k4;
+                sum += d_chunk[out + k + 5] * k5;
+                sum += d_chunk[out + k + 6] * k6;
+                sum += d_chunk[out + k + 7] * k7;
+                
                 o_chunk[out] = sum;
             }
         }
 
         for (; k < KernelSize; ++k) {
             const float kv = kernelPtr[k];
-            
             #pragma clang loop vectorize(disable)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 o_chunk[out] += d_chunk[out + k] * kv;
@@ -84,20 +90,28 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
         const float* d_chunk = dataPtr + start;
 
         size_t k = 0;
-        for (; k + 4 <= KernelSize; k += 4) {
+        for (; k + 8 <= KernelSize; k += 8) {
             const float k0 = kernelPtr[k];
             const float k1 = kernelPtr[k+1];
             const float k2 = kernelPtr[k+2];
             const float k3 = kernelPtr[k+3];
+            const float k4 = kernelPtr[k+4];
+            const float k5 = kernelPtr[k+5];
+            const float k6 = kernelPtr[k+6];
+            const float k7 = kernelPtr[k+7];
 
             #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 float sum = o_chunk[out];
                 
-                sum += d_chunk[out + k] * k0;
+                sum += d_chunk[out + k + 0] * k0;
                 sum += d_chunk[out + k + 1] * k1;
                 sum += d_chunk[out + k + 2] * k2;
                 sum += d_chunk[out + k + 3] * k3;
+                sum += d_chunk[out + k + 4] * k4;
+                sum += d_chunk[out + k + 5] * k5;
+                sum += d_chunk[out + k + 6] * k6;
+                sum += d_chunk[out + k + 7] * k7;
                 
                 o_chunk[out] = sum;
             }

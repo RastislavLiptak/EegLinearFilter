@@ -17,7 +17,7 @@ constexpr float KERNEL_SIGMA = 1.0f;
 
 int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
-    const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
+    const ProcessingMode mode = ProcessingMode::CPU_SEQ_APPLE;
     
     try {
         const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
