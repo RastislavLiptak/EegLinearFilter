@@ -15,7 +15,7 @@
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
@@ -24,13 +24,11 @@ void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
-
-    const size_t chunkSize = 4096;
-    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
-
+    
+    const size_t numChunks = (outSize + ChunkSize - 1) / ChunkSize;
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
-        const size_t start = chunkIndex * chunkSize;
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+        const size_t start = chunkIndex * ChunkSize;
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -67,7 +65,7 @@ void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
     });
 }
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
@@ -77,12 +75,10 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t chunkSize = 4096;
-    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
-
+    const size_t numChunks = (outSize + ChunkSize - 1) / ChunkSize;
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
-        const size_t start = chunkIndex * chunkSize;
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+        const size_t start = chunkIndex * ChunkSize;
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -94,7 +90,7 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
             const float k2 = kernelPtr[k+2];
             const float k3 = kernelPtr[k+3];
 
-            #pragma clang loop vectorize(enable) interleave(enable)
+            #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 float sum = o_chunk[out];
                 
@@ -109,7 +105,7 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
 
         for (; k < KernelSize; ++k) {
             const float kv = kernelPtr[k];
-            #pragma clang loop vectorize(enable)
+            #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 o_chunk[out] += d_chunk[out + k] * kv;
             }
@@ -117,7 +113,7 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
     });
 }
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
@@ -126,12 +122,10 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
     float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t chunkSize = 8192;
-    const size_t numChunks = (outSize + chunkSize - 1) / chunkSize;
-
+    const size_t numChunks = (outSize + ChunkSize - 1) / ChunkSize;
     dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIndex) {
-        const size_t start = chunkIndex * chunkSize;
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+        const size_t start = chunkIndex * ChunkSize;
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
         
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -213,6 +207,7 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
                 vst1q_f32(o_chunk + i, acc);
             }
             
+//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
             for (; i < actualChunkSize; ++i) {
                 for (size_t kk = 0; kk < 8; ++kk) {
                     o_chunk[i] += d_chunk[i + k + kk] * kernelPtr[k + kk];
@@ -230,6 +225,7 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
                 o = vfmaq_f32(o, d, k_vec);
                 vst1q_f32(o_chunk + i, o);
             }
+//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
             for (; i < actualChunkSize; ++i) {
                 o_chunk[i] += d_chunk[i + k] * kv_scalar;
             }

@@ -24,7 +24,7 @@ void convolve_seq_apple(NeonVector& data, NeonVector& outputBuffer, const std::v
     vDSP_conv(data.data(), 1, convolutionKernel.data(), 1, outputBuffer.data(), 1, outSize, KernelSize);
 }
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
@@ -34,10 +34,8 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t chunkSize = 4096;
-
-    for (size_t start = 0; start < outSize; start += chunkSize) {
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+    for (size_t start = 0; start < outSize; start += ChunkSize) {
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -74,7 +72,7 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
     }
 }
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
@@ -84,10 +82,8 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
     float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t chunkSize = 4096;
-
-    for (size_t start = 0; start < outSize; start += chunkSize) {
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+    for (size_t start = 0; start < outSize; start += ChunkSize) {
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -100,7 +96,7 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
             const float k2 = kernelPtr[k+2];
             const float k3 = kernelPtr[k+3];
 
-            #pragma clang loop vectorize(enable) interleave(enable)
+            #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 float sum = o_chunk[out];
 
@@ -116,7 +112,7 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
         for (; k < KernelSize; ++k) {
             const float kv = kernelPtr[k];
             
-            #pragma clang loop vectorize(enable)
+            #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
                 o_chunk[out] += d_chunk[out + k] * kv;
             }
@@ -124,7 +120,7 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
     }
 }
 
-template <int Radius>
+template <int Radius, int ChunkSize>
 void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
@@ -133,9 +129,8 @@ void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const s
     float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
     const float* __restrict kernelPtr = convolutionKernel.data();
 
-    const size_t chunkSize = 8192;
-    for (size_t start = 0; start < outSize; start += chunkSize) {
-        const size_t actualChunkSize = std::min(chunkSize, outSize - start);
+    for (size_t start = 0; start < outSize; start += ChunkSize) {
+        const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
         
         float* o_chunk = outputPtr + start;
         const float* d_chunk = dataPtr + start;
@@ -217,6 +212,7 @@ void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const s
                 vst1q_f32(o_chunk + i, acc);
             }
             
+//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
             for (; i < actualChunkSize; ++i) {
                 for (size_t kk = 0; kk < 8; ++kk) {
                     o_chunk[i] += d_chunk[i + k + kk] * kernelPtr[k + kk];
@@ -234,6 +230,7 @@ void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const s
                 o = vfmaq_f32(o, d, k_vec);
                 vst1q_f32(o_chunk + i, o);
             }
+//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
             for (; i < actualChunkSize; ++i) {
                 o_chunk[i] += d_chunk[i + k] * kv_scalar;
             }

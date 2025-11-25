@@ -11,18 +11,19 @@
 #include "convolution_kernels.hpp"
 #include "processors/processors.hpp"
 
+constexpr int CHUNK_SIZE = 8192;
 constexpr int KERNEL_RADIUS = 256;
 constexpr float KERNEL_SIGMA = 1.0f;
 
 int main(int argc, const char * argv[]) {
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
-    const ProcessingMode mode = ProcessingMode::CPU_SEQ_APPLE;
+    const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
     
     try {
         const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
         NeonVector allData = load_edf_data(filePath, KERNEL_RADIUS);
         
-        run_processor<KERNEL_RADIUS>(
+        run_processor<KERNEL_RADIUS, CHUNK_SIZE>(
             mode,
             allData,
             convolutionKernel
