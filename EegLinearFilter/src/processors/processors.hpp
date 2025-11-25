@@ -15,6 +15,7 @@
 #include <chrono>
 
 enum class ProcessingMode {
+    CPU_SEQ_APPLE,           // Sequential benchmark implementation using Apple vDSP_conv method
     CPU_SEQ_NO_VEC,          // Sequential processing, no vectorization
     CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
     CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
@@ -47,6 +48,10 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     const auto start = std::chrono::high_resolution_clock::now();
     
     switch (mode) {
+        case ProcessingMode::CPU_SEQ_APPLE:
+            std::cout << "Mode: Sequential processing on CPU using Apple implementation" << std::endl;
+            convolve_seq_apple<Radius>(allData, outputBuffer, convolutionKernel);
+            break;
         case ProcessingMode::CPU_SEQ_NO_VEC:
             std::cout << "Mode: Sequential processing on CPU (no-vectorization)" << std::endl;
             convolve_seq_no_vec<Radius>(allData, outputBuffer, convolutionKernel);

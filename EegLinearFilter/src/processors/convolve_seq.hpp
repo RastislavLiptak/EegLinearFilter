@@ -8,11 +8,21 @@
 #ifndef CONVOLVE_SEQ
 #define CONVOLVE_SEQ
 
+#include <Accelerate/Accelerate.h>
 #include "../data_types.hpp"
 #include <arm_neon.h>
 #include <vector>
 
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
+
+template <int Radius>
+void convolve_seq_apple(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    constexpr size_t KernelSize = 2 * Radius + 1;
+    const size_t dataSize = data.size();
+    const size_t outSize = dataSize - KernelSize + 1;
+
+    vDSP_conv(data.data(), 1, convolutionKernel.data(), 1, outputBuffer.data(), 1, outSize, KernelSize);
+}
 
 template <int Radius>
 void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
