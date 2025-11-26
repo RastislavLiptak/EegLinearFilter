@@ -188,45 +188,49 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
                 
                 const float* d = d_chunk + i + k;
 
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 0), k0);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 1), k1);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 2), k2);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 3), k3);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 4), k4);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 5), k5);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 6), k6);
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 7), k7);
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 0),  k0);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4),  k0);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8),  k0);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12), k0);
 
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 0), k0);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 1), k1);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 2), k2);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 3), k3);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 4), k4);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 5), k5);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 6), k6);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4 + 7), k7);
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 1),  k1);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 5),  k1);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 9),  k1);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 13), k1);
 
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 0), k0);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 1), k1);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 2), k2);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 3), k3);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 4), k4);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 5), k5);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 6), k6);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8 + 7), k7);
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 2),  k2);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 6),  k2);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 10), k2);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 14), k2);
 
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 0), k0);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 1), k1);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 2), k2);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 3), k3);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 4), k4);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 5), k5);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 6), k6);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12 + 7), k7);
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 3),  k3);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 7),  k3);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 11), k3);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 15), k3);
 
-                vst1q_f32(o_chunk + i,      acc0);
-                vst1q_f32(o_chunk + i + 4,  acc1);
-                vst1q_f32(o_chunk + i + 8,  acc2);
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 4),  k4);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 8),  k4);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 12), k4);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 16), k4);
+
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 5),  k5);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 9),  k5);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 13), k5);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 17), k5);
+
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 6),  k6);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 10), k6);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 14), k6);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 18), k6);
+
+                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 7),  k7);
+                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 11), k7);
+                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 15), k7);
+                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 19), k7);
+
+                vst1q_f32(o_chunk + i,     acc0);
+                vst1q_f32(o_chunk + i + 4, acc1);
+                vst1q_f32(o_chunk + i + 8, acc2);
                 vst1q_f32(o_chunk + i + 12, acc3);
             }
 
