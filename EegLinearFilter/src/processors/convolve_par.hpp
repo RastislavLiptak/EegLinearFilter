@@ -248,7 +248,7 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
                 vst1q_f32(o_chunk + i, acc);
             }
             
-//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
+            #pragma clang loop vectorize(disable)
             for (; i < actualChunkSize; ++i) {
                 for (size_t kk = 0; kk < 8; ++kk) {
                     o_chunk[i] += d_chunk[i + k + kk] * kernelPtr[k + kk];
@@ -266,7 +266,8 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
                 o = vfmaq_f32(o, d, k_vec);
                 vst1q_f32(o_chunk + i, o);
             }
-//            TODO - tohle by se mělo taky dělat přes vektorové instrukce
+
+            #pragma clang loop vectorize(disable)
             for (; i < actualChunkSize; ++i) {
                 o_chunk[i] += d_chunk[i + k] * kv_scalar;
             }
