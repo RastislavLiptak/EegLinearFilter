@@ -24,7 +24,9 @@ enum class ProcessingMode {
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
     CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
     CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
-    GPU_PAR                  // GPU-accelerated
+    GPU_PAR,                 // GPU-accelerated
+    
+    COUNT
 };
 
 template <int Radius>
