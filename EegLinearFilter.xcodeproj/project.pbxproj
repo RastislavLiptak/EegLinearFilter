@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		D69F13BA2ED5E91E009C3FF8 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F13B92ED5E91E009C3FF8 /* Accelerate.framework */; };
+		D69F13F12ED72E06009C3FF8 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F13F02ED72E06009C3FF8 /* Metal.framework */; };
+		D69F13F32ED72E15009C3FF8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F13F22ED72E15009C3FF8 /* Foundation.framework */; };
+		D69F14862ED73141009C3FF8 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F14852ED73141009C3FF8 /* QuartzCore.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,6 +30,9 @@
 		D630F6012ECC5F40001761CF /* EegLinearFilter */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EegLinearFilter; sourceTree = BUILT_PRODUCTS_DIR; };
 		D630F60C2ECC5F4A001761CF /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
 		D69F13B92ED5E91E009C3FF8 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		D69F13F02ED72E06009C3FF8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		D69F13F22ED72E15009C3FF8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		D69F14852ED73141009C3FF8 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -42,6 +48,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D69F14862ED73141009C3FF8 /* QuartzCore.framework in Frameworks */,
+				D69F13F12ED72E06009C3FF8 /* Metal.framework in Frameworks */,
+				D69F13F32ED72E15009C3FF8 /* Foundation.framework in Frameworks */,
 				D69F13BA2ED5E91E009C3FF8 /* Accelerate.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -70,6 +79,9 @@
 		D630F60B2ECC5F4A001761CF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D69F14852ED73141009C3FF8 /* QuartzCore.framework */,
+				D69F13F22ED72E15009C3FF8 /* Foundation.framework */,
+				D69F13F02ED72E06009C3FF8 /* Metal.framework */,
 				D69F13B92ED5E91E009C3FF8 /* Accelerate.framework */,
 				D630F60C2ECC5F4A001761CF /* OpenCL.framework */,
 			);
@@ -268,7 +280,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = TG9Q2M88Z2;
 				ENABLE_HARDENED_RUNTIME = YES;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EegLinearFilter/lib/metal-cpp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TAPI_LANGUAGE_STANDARD = "c++23";
 			};
 			name = Debug;
 		};
@@ -278,6 +292,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = TG9Q2M88Z2;
 				ENABLE_HARDENED_RUNTIME = YES;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EegLinearFilter/lib/metal-cpp";
 				"OTHER_CPLUSPLUSFLAGS[arch=*]" = (
 					"-Rpass=loop-vectorize",
 					"-Rpass-missed=loop-vectorize",
@@ -285,6 +300,7 @@
 					"-ffast-math",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TAPI_LANGUAGE_STANDARD = "c++23";
 			};
 			name = Release;
 		};

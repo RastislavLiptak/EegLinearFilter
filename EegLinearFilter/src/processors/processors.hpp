@@ -11,6 +11,7 @@
 
 #include "convolve_par.hpp"
 #include "convolve_seq.hpp"
+#include "convolve_gpu/convolve_gpu.hpp"
 #include <iostream>
 #include <chrono>
 
@@ -24,7 +25,7 @@ enum class ProcessingMode {
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
     CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
     CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
-    GPU_PAR,                 // GPU-accelerated
+    GPU,                     // GPU-accelerated
     
     COUNT
 };
@@ -88,9 +89,9 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
             std::cout << "Mode: Parallel processing on CPU (manual-vectorization)" << std::endl;
             convolve_par_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
-        case ProcessingMode::GPU_PAR:
+        case ProcessingMode::GPU:
             std::cout << "Mode: GPU processing" << std::endl;
-            // TODO - process data
+            convolve_gpu<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
         default:
             throw std::runtime_error("Unknown processing mode");

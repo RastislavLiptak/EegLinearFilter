@@ -47,7 +47,7 @@ int main(int argc, const char * argv[]) {
             std::cout << "Starting single run" << std::endl;
             std::cout << "----------------------------------------\n";
             
-            const ProcessingMode mode = ProcessingMode::CPU_PAR_AUTO_VEC;
+            const ProcessingMode mode = ProcessingMode::GPU;
             run_processor(mode, allData, convolutionKernel);
         }
         
