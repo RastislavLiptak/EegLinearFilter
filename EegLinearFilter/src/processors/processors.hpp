@@ -50,6 +50,10 @@ template <int Radius, int ChunkSize>
 void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
     
     NeonVector outputBuffer(allData.size(), 0.0f);
+    if (mode == ProcessingMode::GPU) {
+        init_gpu_resources();
+    }
+    
     const auto start = std::chrono::high_resolution_clock::now();
     
     switch (mode) {
