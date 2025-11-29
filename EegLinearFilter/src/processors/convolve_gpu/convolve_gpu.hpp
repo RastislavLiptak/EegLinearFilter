@@ -29,7 +29,7 @@ struct MetalContext {
     MetalContext() {
         device = MTL::CreateSystemDefaultDevice();
         if (!device) {
-             throw std::runtime_error("Error: Failed to create Metal device!");
+            throw std::runtime_error("Error: Failed to create Metal device!");
         }
         commandQueue = device->newCommandQueue();
         
@@ -49,7 +49,7 @@ struct MetalContext {
         pipelineState = device->newComputePipelineState(convolutionFunction, &error);
         
         if (!pipelineState) {
-             throw std::runtime_error("Pipeline creation failed");
+            throw std::runtime_error("Pipeline creation failed");
         }
 
         functionName->release();
@@ -82,6 +82,7 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     constexpr size_t KSizeConst = 2 * Radius + 1;
     uint32_t KernelSize = (uint32_t)KSizeConst;
     uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
+    uint32_t rawDataSize = (uint32_t)data.size();
     
     MetalContext& ctx = MetalContext::get();
 
@@ -107,7 +108,6 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
 
     MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
     MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
-    
     computeEncoder->setComputePipelineState(ctx.pipelineState);
     
     computeEncoder->setBuffer(dataBuffer, 0, 0);
@@ -115,12 +115,12 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     computeEncoder->setBuffer(kernelBuffer, 0, 2);
     computeEncoder->setBytes(&KernelSize, sizeof(uint32_t), 3);
     computeEncoder->setBytes(&outSize, sizeof(uint32_t), 4);
-
-    NS::UInteger threadgroupMemSize = (TILE_SIZE + KernelSize - 1) * sizeof(float);
+    computeEncoder->setBytes(&rawDataSize, sizeof(uint32_t), 5);
+    
+    NS::UInteger threadgroupMemSize = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * sizeof(float);
     computeEncoder->setThreadgroupMemoryLength(threadgroupMemSize, 0);
 
     NS::UInteger numGroups = (outSize + TILE_SIZE - 1) / TILE_SIZE;
-    
     MTL::Size groupSize = MTL::Size::Make(THREADS_PER_GROUP, 1, 1);
     MTL::Size gridSize = MTL::Size::Make(numGroups * THREADS_PER_GROUP, 1, 1);
     
