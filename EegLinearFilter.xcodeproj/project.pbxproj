@@ -33,6 +33,7 @@
 		D69F13F02ED72E06009C3FF8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		D69F13F22ED72E15009C3FF8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		D69F14852ED73141009C3FF8 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		D6E741EA2EDA467300217976 /* MetalPerformanceShaders.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalPerformanceShaders.framework; path = System/Library/Frameworks/MetalPerformanceShaders.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +80,7 @@
 		D630F60B2ECC5F4A001761CF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D6E741EA2EDA467300217976 /* MetalPerformanceShaders.framework */,
 				D69F14852ED73141009C3FF8 /* QuartzCore.framework */,
 				D69F13F22ED72E15009C3FF8 /* Foundation.framework */,
 				D69F13F02ED72E06009C3FF8 /* Metal.framework */,
@@ -212,8 +214,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_COMPILER_FLAGS = "-ffast-math";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
+				MTL_OPTIMIZATION_LEVEL = "-O3";
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 			};
@@ -268,8 +272,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_COMPILER_FLAGS = "-ffast-math";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				MTL_OPTIMIZATION_LEVEL = "-O3";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -281,6 +287,8 @@
 				DEVELOPMENT_TEAM = TG9Q2M88Z2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EegLinearFilter/lib/metal-cpp";
+				MTL_COMPILER_FLAGS = "-ffast-math";
+				MTL_OPTIMIZATION_LEVEL = "-O3";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TAPI_LANGUAGE_STANDARD = "c++23";
 			};
@@ -293,6 +301,8 @@
 				DEVELOPMENT_TEAM = TG9Q2M88Z2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EegLinearFilter/lib/metal-cpp";
+				MTL_COMPILER_FLAGS = "-ffast-math";
+				MTL_OPTIMIZATION_LEVEL = "-O3";
 				"OTHER_CPLUSPLUSFLAGS[arch=*]" = (
 					"-Rpass=loop-vectorize",
 					"-Rpass-missed=loop-vectorize",

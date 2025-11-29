@@ -51,7 +51,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     NeonVector outputBuffer(allData.size(), 0.0f);
     if (mode == ProcessingMode::GPU) {
-        init_gpu_resources();
+        warmup_gpu();
     }
     
     const auto start = std::chrono::high_resolution_clock::now();

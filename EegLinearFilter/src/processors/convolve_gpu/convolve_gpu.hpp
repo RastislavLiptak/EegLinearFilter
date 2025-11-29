@@ -8,15 +8,17 @@
 #ifndef CONVOLVE_GPU_HPP
 #define CONVOLVE_GPU_HPP
 
+#define NS_PRIVATE_IMPLEMENTATION
+#define CA_PRIVATE_IMPLEMENTATION
+#define MTL_PRIVATE_IMPLEMENTATION
+#include <Foundation/Foundation.hpp>
+#include <Metal/Metal.hpp>
+#include <QuartzCore/QuartzCore.hpp>
+
 #include "../../data_types.hpp"
 #include <vector>
 #include <iostream>
-
-#define NS_PRIVATE_IMPLEMENTATION
-#define MTL_PRIVATE_IMPLEMENTATION
-#define MTK_PRIVATE_IMPLEMENTATION
-#include <Metal/Metal.hpp>
-#include <Foundation/Foundation.hpp>
+#include <stdexcept>
 
 struct MetalContext {
     MTL::Device* device = nullptr;
@@ -25,52 +27,100 @@ struct MetalContext {
 
     MetalContext() {
         device = MTL::CreateSystemDefaultDevice();
+        if (!device) {
+             throw std::runtime_error("Error: Failed to create Metal device!");
+        }
         commandQueue = device->newCommandQueue();
+        
         NS::Error* error = nullptr;
         MTL::Library* library = device->newDefaultLibrary();
+        if (!library) {
+            throw std::runtime_error("Error: Default library not found!");
+        }
         
-        NS::String* functionName = NS::String::string("convolve_corrected", NS::UTF8StringEncoding);
+        NS::String* functionName = NS::String::string("convolve_kernel_optimized_12x", NS::UTF8StringEncoding);
         MTL::Function* convolutionFunction = library->newFunction(functionName);
         
         if (!convolutionFunction) {
-             std::cerr << "Error: Function 'convolve_corrected' not found!" << std::endl;
-             exit(1);
+            throw std::runtime_error("Error: Function 'convolve_kernel_optimized_12x' not found in .metallib!");
         }
+        
         pipelineState = device->newComputePipelineState(convolutionFunction, &error);
-        functionName->release(); convolutionFunction->release(); library->release();
+        
+        if (!pipelineState) {
+             std::cerr << "Failed to create pipeline state: " << error->localizedDescription()->utf8String() << std::endl;
+             throw std::runtime_error("Pipeline creation failed");
+        }
+
+        functionName->release();
+        convolutionFunction->release();
+        library->release();
     }
-    static MetalContext& get() { static MetalContext instance; return instance; }
+    
+    ~MetalContext() {
+        if (pipelineState) pipelineState->release();
+        if (commandQueue) commandQueue->release();
+        if (device) device->release();
+    }
+    
+    static MetalContext& get() {
+        static MetalContext instance;
+        return instance;
+    }
 };
 
-inline void init_gpu_resources() { MetalContext::get(); }
+inline void warmup_gpu() {
+    try {
+        MetalContext::get();
+    } catch (const std::exception& e) {
+        std::cerr << "GPU Warmup failed: " << e.what() << std::endl;
+    }
+}
 
 template <int Radius, int ChunkSize>
 void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    const int THREADS_PER_GROUP = 256;
+    const int ITEMS_PER_THREAD = 12;
+    const int TILE_SIZE = THREADS_PER_GROUP * ITEMS_PER_THREAD;
+    
+    constexpr size_t KSizeConst = 2 * Radius + 1;
+    uint32_t KernelSize = (uint32_t)KSizeConst;
+    uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
+    
     MetalContext& ctx = MetalContext::get();
 
-    MTL::Buffer* dataBuffer = ctx.device->newBuffer((void*)data.data(), data.size() * sizeof(float), MTL::ResourceStorageModeShared, nullptr);
-    MTL::Buffer* outBuffer = ctx.device->newBuffer((void*)outputBuffer.data(), outputBuffer.size() * sizeof(float), MTL::ResourceStorageModeShared, nullptr);
-    MTL::Buffer* kernelBuffer = ctx.device->newBuffer(convolutionKernel.data(), convolutionKernel.size() * sizeof(float), MTL::ResourceStorageModeShared, nullptr);
+    MTL::Buffer* dataBuffer = ctx.device->newBuffer(
+        (void*)data.data(),
+        data.size() * sizeof(float),
+        MTL::ResourceStorageModeShared,
+        nullptr
+    );
+    
+    MTL::Buffer* outBuffer = ctx.device->newBuffer(
+        (void*)outputBuffer.data(),
+        outputBuffer.size() * sizeof(float),
+        MTL::ResourceStorageModeShared,
+        nullptr
+    );
+    
+    MTL::Buffer* kernelBuffer = ctx.device->newBuffer(
+        convolutionKernel.data(),
+        convolutionKernel.size() * sizeof(float),
+        MTL::ResourceStorageModeShared
+    );
 
     MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
     MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
-    computeEncoder->setComputePipelineState(ctx.pipelineState);
     
-    constexpr size_t KSizeConst = 2 * Radius + 1;
-    uint32_t kernelSize = (uint32_t)KSizeConst;
-    uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
+    computeEncoder->setComputePipelineState(ctx.pipelineState);
     
     computeEncoder->setBuffer(dataBuffer, 0, 0);
     computeEncoder->setBuffer(outBuffer, 0, 1);
     computeEncoder->setBuffer(kernelBuffer, 0, 2);
-    computeEncoder->setBytes(&kernelSize, sizeof(uint32_t), 3);
+    computeEncoder->setBytes(&KernelSize, sizeof(uint32_t), 3);
     computeEncoder->setBytes(&outSize, sizeof(uint32_t), 4);
 
-    const int THREADS_PER_GROUP = 256;
-    const int ITEMS_PER_THREAD = 4;
-    const int TILE_SIZE = THREADS_PER_GROUP * ITEMS_PER_THREAD;
-    
-    NS::UInteger threadgroupMemSize = (TILE_SIZE + kernelSize - 1) * sizeof(float);
+    NS::UInteger threadgroupMemSize = (TILE_SIZE + KernelSize - 1) * sizeof(float);
     computeEncoder->setThreadgroupMemoryLength(threadgroupMemSize, 0);
 
     NS::UInteger numGroups = (outSize + TILE_SIZE - 1) / TILE_SIZE;
@@ -80,10 +130,13 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     
     computeEncoder->dispatchThreads(gridSize, groupSize);
     computeEncoder->endEncoding();
+    
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
 
-    dataBuffer->release(); outBuffer->release(); kernelBuffer->release();
+    dataBuffer->release();
+    outBuffer->release();
+    kernelBuffer->release();
 }
 
 #endif // CONVOLVE_GPU_HPP
