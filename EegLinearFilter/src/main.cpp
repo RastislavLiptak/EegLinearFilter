@@ -31,7 +31,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
 
 int main(int argc, const char * argv[]) {
     const bool run_all_variants = false;
-    const bool save_results = true;
+    const bool save_results = false;
     const char* filePath = "EegLinearFilter/data/PN00-1.edf";
     
     try {
