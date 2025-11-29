@@ -15,6 +15,7 @@
 #include <Metal/Metal.hpp>
 #include <QuartzCore/QuartzCore.hpp>
 
+#include "kernel_config.h"
 #include "../../data_types.hpp"
 #include <vector>
 #include <iostream>
@@ -38,17 +39,16 @@ struct MetalContext {
             throw std::runtime_error("Error: Default library not found!");
         }
         
-        NS::String* functionName = NS::String::string("convolve_kernel_optimized_12x", NS::UTF8StringEncoding);
+        NS::String* functionName = NS::String::string("convolve_kernel", NS::UTF8StringEncoding);
         MTL::Function* convolutionFunction = library->newFunction(functionName);
         
         if (!convolutionFunction) {
-            throw std::runtime_error("Error: Function 'convolve_kernel_optimized_12x' not found in .metallib!");
+            throw std::runtime_error("Error: Function 'convolve_kernel' not found in .metallib!");
         }
         
         pipelineState = device->newComputePipelineState(convolutionFunction, &error);
         
         if (!pipelineState) {
-             std::cerr << "Failed to create pipeline state: " << error->localizedDescription()->utf8String() << std::endl;
              throw std::runtime_error("Pipeline creation failed");
         }
 
@@ -73,16 +73,12 @@ inline void warmup_gpu() {
     try {
         MetalContext::get();
     } catch (const std::exception& e) {
-        std::cerr << "GPU Warmup failed: " << e.what() << std::endl;
+        throw std::runtime_error("GPU Warmup failed");
     }
 }
 
 template <int Radius, int ChunkSize>
 void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
-    const int THREADS_PER_GROUP = 256;
-    const int ITEMS_PER_THREAD = 12;
-    const int TILE_SIZE = THREADS_PER_GROUP * ITEMS_PER_THREAD;
-    
     constexpr size_t KSizeConst = 2 * Radius + 1;
     uint32_t KernelSize = (uint32_t)KSizeConst;
     uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
