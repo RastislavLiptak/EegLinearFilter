@@ -11,11 +11,7 @@
 #include "io/io.hpp"
 #include "convolution_kernels.hpp"
 #include "processors/processors.hpp"
-
-//TODO - přidat validátor kompilačních konstant
-constexpr int CHUNK_SIZE = 8192;
-constexpr int KERNEL_RADIUS = 256;
-constexpr float KERNEL_SIGMA = 1.0f;
+#include "config.h"
 
 void run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel, const bool save_results) {
     run_processor<KERNEL_RADIUS, CHUNK_SIZE>(

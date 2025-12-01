@@ -6,7 +6,7 @@
 //
 
 #include <metal_stdlib>
-#include "kernel_config.h"
+#include "../../config.h"
 
 using namespace metal;
 

@@ -8,27 +8,12 @@
 #ifndef PROCESSORS_HPP
 #define PROCESSORS_HPP
 
-
+#include "../config.h"
 #include "convolve_par.hpp"
 #include "convolve_seq.hpp"
 #include "convolve_gpu/convolve_gpu.hpp"
 #include <iostream>
 #include <chrono>
-
-enum class ProcessingMode {
-    CPU_SEQ_APPLE,           // Sequential benchmark implementation using Apple vDSP_conv method
-    CPU_SEQ_NAIVE,           // Sequential naive approach without optimization
-    CPU_SEQ_NO_VEC,          // Sequential processing, no vectorization
-    CPU_SEQ_AUTO_VEC,        // Sequential, auto-vectorization
-    CPU_SEQ_MANUAL_VEC,      // Sequential, manual vectorization
-    CPU_PAR_NAIVE,           // Parallel naive approach without optimization
-    CPU_PAR_NO_VEC,          // Parallel, no vectorization
-    CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
-    CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
-    GPU,                     // GPU-accelerated
-    
-    COUNT
-};
 
 template <int Radius>
 void calc_benchmarks(const std::chrono::duration<double> elapsed, size_t dataSize) {
@@ -51,7 +36,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     NeonVector outputBuffer(allData.size(), 0.0f);
     if (mode == ProcessingMode::GPU) {
-        warmup_gpu<Radius, ChunkSize>();
+        warmup_gpu();
     }
     
     const auto start = std::chrono::high_resolution_clock::now();
@@ -95,7 +80,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
             break;
         case ProcessingMode::GPU:
             std::cout << "Mode: GPU processing" << std::endl;
-            convolve_gpu<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         default:
             throw std::runtime_error("Unknown processing mode");

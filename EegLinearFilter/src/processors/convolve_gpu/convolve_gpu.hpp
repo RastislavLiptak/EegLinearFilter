@@ -15,7 +15,7 @@
 #include <Metal/Metal.hpp>
 #include <QuartzCore/QuartzCore.hpp>
 
-#include "kernel_config.h"
+#include "../../config.h"
 #include "../../data_types.hpp"
 #include <vector>
 #include <iostream>
@@ -70,7 +70,7 @@ struct MetalContext {
     }
 };
 
-template <int Radius, int ChunkSize>
+template <int Radius>
 void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KSizeConst = 2 * Radius + 1;
     uint32_t KernelSize = (uint32_t)KSizeConst;
@@ -132,7 +132,6 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     kernelBuffer->release();
 }
 
-template <int Radius, int ChunkSize>
 void warmup_gpu() {
     try {
         std::cout << "GPU warm-up ..." << std::endl;
@@ -140,8 +139,9 @@ void warmup_gpu() {
 
         MetalContext& ctx = MetalContext::get();
 
+        constexpr size_t RADIUS = 512;
         constexpr size_t DUMMY_SIZE = 1024 * 1024 * 2;
-        constexpr size_t KSizeConst = 2 * Radius + 1;
+        constexpr size_t KSizeConst = 2 * RADIUS + 1;
         
         uint32_t KernelSize = (uint32_t)KSizeConst;
         uint32_t rawDataSize = (uint32_t)DUMMY_SIZE;
@@ -149,13 +149,13 @@ void warmup_gpu() {
         
         MTL::Buffer* dataBuffer = ctx.device->newBuffer(DUMMY_SIZE * sizeof(float), MTL::ResourceStorageModeShared);
         MTL::Buffer* outBuffer  = ctx.device->newBuffer(DUMMY_SIZE * sizeof(float), MTL::ResourceStorageModeShared);
-        MTL::Buffer* kernelBuffer = ctx.device->newBuffer((2 * Radius + 1) * sizeof(float), MTL::ResourceStorageModeShared);
+        MTL::Buffer* kernelBuffer = ctx.device->newBuffer((2 * RADIUS + 1) * sizeof(float), MTL::ResourceStorageModeShared);
 
         memset(dataBuffer->contents(), 0, DUMMY_SIZE * sizeof(float));
         memset(outBuffer->contents(), 0, DUMMY_SIZE * sizeof(float));
         
         float* rawKernel = static_cast<float*>(kernelBuffer->contents());
-        for(int i = 0; i < (2 * Radius + 1); ++i) {
+        for(int i = 0; i < (2 * RADIUS + 1); ++i) {
             rawKernel[i] = 0.01f;
         }
 
