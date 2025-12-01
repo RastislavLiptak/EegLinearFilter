@@ -13,6 +13,15 @@
 #include <vector>
 #include <cstddef>
 
+struct AppConfig {
+    std::string filePath;
+    bool runAllVariants;
+    std::optional<ProcessingMode> mode;
+    int iterationCount;
+    bool saveResults;
+    std::string outputFolderPath;
+};
+
 template <typename T, std::size_t Alignment>
 struct aligned_allocator {
     using value_type = T;

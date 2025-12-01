@@ -62,8 +62,8 @@ static_assert(THREADS_PER_GROUP > 0, "THREADS_PER_GROUP must be greater than 0."
 static_assert(THREADS_PER_GROUP <= 1024, "THREADS_PER_GROUP cannot exceed hardware limit (1024).");
 static_assert(ITEMS_PER_THREAD == 16, "ITEMS_PER_THREAD must be 16 (Metal kernel relies on explicit v0-v15 registers).");
 
-constexpr size_t REQUIRED_THREADGROUP_MEM = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * sizeof(float);
-constexpr size_t MAX_SAFE_THREADGROUP_MEM = 32768;
+constexpr std::size_t REQUIRED_THREADGROUP_MEM = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * sizeof(float);
+constexpr std::size_t MAX_SAFE_THREADGROUP_MEM = 32768;
 static_assert(REQUIRED_THREADGROUP_MEM <= MAX_SAFE_THREADGROUP_MEM, "Required threadgroup memory exceeds GPU limit (32KB). Reduce KERNEL_SEGMENT_SIZE or THREADS_PER_GROUP.");
 
 static_assert(KERNEL_SEGMENT_SIZE > 0, "KERNEL_SEGMENT_SIZE must be > 0.");

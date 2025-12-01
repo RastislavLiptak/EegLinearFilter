@@ -56,5 +56,5 @@ void save_data(const NeonVector& data, const std::string& filepath, const std::v
     }
     
     std::cout << std::endl;
-    std::cout << "----------------------------------------\n";
+    std::cout << "========================================\n";
 }

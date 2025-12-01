@@ -126,7 +126,7 @@ NeonVector load_edf_data(const char* filePath, const int padding) {
     std::cout << "Samples per signal: " << meta.samplesPerSignal << "\n";
     std::cout << "Total records: " << (meta.totalSignals * meta.samplesPerSignal) << "\n";
     std::cout << "Data size: " << (meta.dataSize / 1024 / 1024) << " MB\n";
-    std::cout << "----------------------------------------\n";
+    std::cout << "========================================\n";
     
     size_t totalSamplesPadded = static_cast<size_t>(meta.totalSignals) * meta.samplesPerSignalPadded;
     NeonVector allData(totalSamplesPadded);

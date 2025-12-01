@@ -40,7 +40,7 @@ std::vector<float> create_gaussian_kernel(const float sigma) {
     std::cout << "Size: " << size << " | ";
     std::cout << "Radius: " << Radius << " | ";
     std::cout << "Sigma: " << sigma << "\n";
-    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "========================================" << std::endl;
     
     return kernel;
 }
