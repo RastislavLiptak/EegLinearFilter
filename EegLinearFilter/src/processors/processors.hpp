@@ -51,7 +51,7 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     
     NeonVector outputBuffer(allData.size(), 0.0f);
     if (mode == ProcessingMode::GPU) {
-        warmup_gpu();
+        warmup_gpu<Radius, ChunkSize>();
     }
     
     const auto start = std::chrono::high_resolution_clock::now();
@@ -105,6 +105,8 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
     const std::chrono::duration<double> elapsed = end - start;
     
     allData.swap(outputBuffer);
+    outputBuffer.clear();
+    outputBuffer.shrink_to_fit();
     
     calc_benchmarks<Radius>(elapsed, allData.size());
 }

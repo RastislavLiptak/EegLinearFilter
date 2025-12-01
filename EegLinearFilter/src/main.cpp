@@ -12,6 +12,7 @@
 #include "convolution_kernels.hpp"
 #include "processors/processors.hpp"
 
+//TODO - přidat validátor kompilačních konstant
 constexpr int CHUNK_SIZE = 8192;
 constexpr int KERNEL_RADIUS = 256;
 constexpr float KERNEL_SIGMA = 1.0f;
@@ -30,9 +31,11 @@ void run_processor(const ProcessingMode mode, NeonVector& allData, const std::ve
 }
 
 int main(int argc, const char * argv[]) {
+//    TODO - nastavení parametrů přes příkazovou řádku
     const bool run_all_variants = false;
+    const ProcessingMode mode = ProcessingMode::GPU;
     const bool save_results = false;
-    const char* filePath = "EegLinearFilter/data/PN00-1.edf";
+    const char* filePath = "EegLinearFilter/data/PN01-1.edf";
     
     try {
         const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
@@ -47,10 +50,6 @@ int main(int argc, const char * argv[]) {
                 run_processor(static_cast<ProcessingMode>(i), workingData, convolutionKernel, save_results);
             }
         } else {
-            std::cout << "Starting single run" << std::endl;
-            std::cout << "----------------------------------------\n";
-            
-            const ProcessingMode mode = ProcessingMode::GPU;
             run_processor(mode, allData, convolutionKernel, save_results);
         }
         

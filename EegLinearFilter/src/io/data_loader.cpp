@@ -12,103 +12,170 @@
 #include <stdexcept>
 #include <string>
 #include <algorithm>
+#include <vector>
+#include <cmath>
+#include <fstream>
 
-void validate_edf_header(const edflib_hdr_t& hdr, size_t& totalSamples, int& samplesToRead) {
-    const int totalSignals = hdr.edfsignals;
-    if (totalSignals <= 0) {
+struct EdfFileGuard {
+    int handle;
+
+    explicit EdfFileGuard(int h) : handle(h) {}
+    
+    ~EdfFileGuard() {
+        if (handle >= 0) {
+            edfclose_file(handle);
+        }
+    }
+
+    EdfFileGuard(const EdfFileGuard&) = delete;
+    EdfFileGuard& operator=(const EdfFileGuard&) = delete;
+};
+
+struct ChannelInfo {
+    int smpInRecord;
+    float scale;
+    float offset;
+};
+
+struct FileMetadata {
+    int totalSignals;
+    int samplesPerSignal;
+    size_t totalSamples;
+    int bytesPerRecord;
+    long long numRecords;
+    size_t samplesPerSignalPadded;
+    size_t headerSize;
+    size_t dataSize;
+};
+
+FileMetadata parse_header_and_channels(const char* filePath, const int padding, std::vector<ChannelInfo>& channels) {
+    edflib_hdr_t hdr;
+    if (edfopen_file_readonly(filePath, &hdr, EDFLIB_DO_NOT_READ_ANNOTATIONS) < 0) {
+        throw std::runtime_error("Header load failed");
+    }
+
+    EdfFileGuard fileGuard(hdr.handle);
+    FileMetadata meta;
+    meta.totalSignals = hdr.edfsignals;
+    
+    if (meta.totalSignals <= 0) {
         throw std::runtime_error("No signals found in EDF header");
     }
 
-    const long long samplesPerSignalLL = hdr.signalparam[0].smp_in_file;
-    for (int s = 0; s < totalSignals; ++s) {
+    long long samplesPerSignalLL = hdr.signalparam[0].smp_in_file;
+    for (int s = 0; s < meta.totalSignals; ++s) {
         if (hdr.signalparam[s].smp_in_file != samplesPerSignalLL) {
-            throw std::runtime_error("The signals do not have the same number of samples: signal " + std::to_string(s) + " has " + std::to_string(hdr.signalparam[s].smp_in_file) + ", expected " + std::to_string(samplesPerSignalLL));
+            throw std::runtime_error("Signals have mismatching sample counts.");
         }
     }
 
     if (samplesPerSignalLL < 0 || samplesPerSignalLL > std::numeric_limits<int>::max()) {
-        throw std::runtime_error("Number of samples per signal is out of int range");
+        throw std::runtime_error("Sample count out of int range");
     }
-    samplesToRead = static_cast<int>(samplesPerSignalLL);
 
-    const std::uint64_t totalSamplesU64 = static_cast<uint64_t>(totalSignals) * static_cast<uint64_t>(samplesPerSignalLL);
-    if (totalSamplesU64 > static_cast<uint64_t>(std::numeric_limits<std::size_t>::max())) {
-        throw std::runtime_error("Total samples exceed size_t range");
+    meta.samplesPerSignal = static_cast<int>(samplesPerSignalLL);
+    meta.totalSamples = static_cast<size_t>(meta.totalSignals) * static_cast<size_t>(meta.samplesPerSignal);
+
+    channels.resize(meta.totalSignals);
+    meta.bytesPerRecord = 0;
+
+    for (int i = 0; i < meta.totalSignals; ++i) {
+        channels[i].smpInRecord = hdr.signalparam[i].smp_in_datarecord;
+        meta.bytesPerRecord += channels[i].smpInRecord * 2;
+
+        double phys_min = hdr.signalparam[i].phys_min;
+        double phys_max = hdr.signalparam[i].phys_max;
+        double dig_min  = hdr.signalparam[i].dig_min;
+        double dig_max  = hdr.signalparam[i].dig_max;
+
+        if (dig_max == dig_min) {
+            channels[i].scale = 1.0f;
+            channels[i].offset = 0.0f;
+        } else {
+            channels[i].scale = static_cast<float>((phys_max - phys_min) / (dig_max - dig_min));
+            channels[i].offset = static_cast<float>(phys_min - (dig_min * channels[i].scale));
+        }
     }
-    totalSamples = static_cast<size_t>(totalSamplesU64);
+
+    meta.samplesPerSignalPadded = static_cast<size_t>(meta.samplesPerSignal) + (2 * padding);
+    meta.headerSize = 256 + (meta.totalSignals * 256);
+    
+    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+    if (!file) {
+        throw std::runtime_error("Cannot open file to check size");
+    }
+    std::streamsize fileSize = file.tellg();
+
+    meta.dataSize = fileSize - meta.headerSize;
+    if (meta.dataSize <= 0) {
+        throw std::runtime_error("Invalid data size");
+    }
+
+    meta.numRecords = meta.dataSize / meta.bytesPerRecord;
+
+    return meta;
 }
 
 NeonVector load_edf_data(const char* filePath, const int padding) {
-    edflib_hdr_t hdr;
+    std::cout << "Loading file: " << filePath << "\n";
+    
+    std::vector<ChannelInfo> channels;
+    FileMetadata meta = parse_header_and_channels(filePath, padding, channels);
 
-    if (padding < 0) {
-        throw std::runtime_error("Padding cannot be negative");
-    }
-
-    const int handle = edfopen_file_readonly(filePath, &hdr, EDFLIB_DO_NOT_READ_ANNOTATIONS);
-    if (handle < 0) {
-        throw std::runtime_error(std::string("Data load failed: ") + filePath);
-    }
-
-    struct EdfHandle {
-        int handle;
-        EdfHandle(int h) : handle(h) {}
-        ~EdfHandle() { edfclose_file(handle); }
-    } handleGuard(handle);
-
-    size_t rawTotalSamples = 0;
-    int samplesPerSignal = 0;
-    validate_edf_header(hdr, rawTotalSamples, samplesPerSignal);
-
-    const int totalSignals = hdr.edfsignals;
-
-    size_t samplesPerSignalPadded = static_cast<size_t>(samplesPerSignal) + (2 * padding);
-    size_t totalSamplesPadded = static_cast<size_t>(totalSignals) * samplesPerSignalPadded;
-
-    const int barWidth = 24;
-    std::vector<double> tempBuffer(samplesPerSignal);
+    std::cout << "Signal count: " << meta.totalSignals << "\n";
+    std::cout << "Samples per signal: " << meta.samplesPerSignal << "\n";
+    std::cout << "Total records: " << (meta.totalSignals * meta.samplesPerSignal) << "\n";
+    std::cout << "Data size: " << (meta.dataSize / 1024 / 1024) << " MB\n";
+    std::cout << "----------------------------------------\n";
+    
+    size_t totalSamplesPadded = static_cast<size_t>(meta.totalSignals) * meta.samplesPerSignalPadded;
     NeonVector allData(totalSamplesPadded);
 
-    std::cout << "Loading file: " << filePath << "\n";
-    std::cout << "Signal count: " << totalSignals << "\n";
-    std::cout << "Samples in signal: " << samplesPerSignal << "\n";
-    std::cout << "Total samples: " << rawTotalSamples << "\n";
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Cannot open file for binary read");
+    }
+    file.seekg(meta.headerSize, std::ios::beg);
 
-    for (int signal = 0; signal < totalSignals; ++signal) {
-        const int read = edfread_physical_samples(handle, signal, samplesPerSignal, tempBuffer.data());
-        if (read != samplesPerSignal) {
-            throw std::runtime_error("Error reading signal " + std::to_string(signal));
-        }
+    std::vector<int16_t> recordBuffer(meta.bytesPerRecord / 2);
 
-        if (read == 0) continue;
-
-        const size_t channelStartOffset = static_cast<size_t>(signal) * samplesPerSignalPadded;
-
-        float firstVal = static_cast<float>(tempBuffer[0]);
-        float lastVal = static_cast<float>(tempBuffer[read - 1]);
-
-        std::fill_n(allData.begin() + channelStartOffset, padding, firstVal);
-
-        std::transform(
-            tempBuffer.begin(),
-            tempBuffer.begin() + read,
-            allData.begin() + channelStartOffset + padding,
-            [](double d) { return static_cast<float>(d); }
-        );
-
-        std::fill_n(allData.begin() + channelStartOffset + padding + read, padding, lastVal);
-
-        const float progress = static_cast<float>(signal + 1) / totalSignals;
-        const int pos = static_cast<int>(progress * barWidth);
-
-        std::cout << "\rLoading: [";
-        for (int i = 0; i < barWidth; ++i) {
-            std::cout << (i < pos ? "█" : " ");
-        }
-        std::cout << "] " << std::setw(3) << static_cast<int>(progress * 100) << "%" << std::flush;
+    std::vector<float*> channelWritePtrs(meta.totalSignals);
+    for(int s = 0; s < meta.totalSignals; ++s) {
+        channelWritePtrs[s] = &allData[static_cast<size_t>(s) * meta.samplesPerSignalPadded + padding];
     }
 
-    std::cout << "\n----------------------------------------\n";
+    for (long long r = 0; r < meta.numRecords; ++r) {
+        if (!file.read(reinterpret_cast<char*>(recordBuffer.data()), meta.bytesPerRecord)) {
+             if (file.gcount() == 0) break;
+        }
+
+        int bufferOffset = 0;
+        for (int s = 0; s < meta.totalSignals; ++s) {
+            const auto& ch = channels[s];
+            float* dst = channelWritePtrs[s];
+
+            for (int k = 0; k < ch.smpInRecord; ++k) {
+                *dst = static_cast<float>(recordBuffer[bufferOffset++]) * ch.scale + ch.offset;
+                dst++;
+            }
+            
+            channelWritePtrs[s] = dst;
+        }
+    }
+
+    file.close();
+
+    for (int s = 0; s < meta.totalSignals; ++s) {
+        float* dataStart = &allData[static_cast<size_t>(s) * meta.samplesPerSignalPadded + padding];
+        
+        if (meta.samplesPerSignal > 0) {
+            float firstVal = dataStart[0];
+            std::fill_n(dataStart - padding, padding, firstVal);
+
+            float lastVal = dataStart[meta.samplesPerSignal - 1];
+            std::fill_n(dataStart + meta.samplesPerSignal, padding, lastVal);
+        }
+    }
 
     return allData;
 }

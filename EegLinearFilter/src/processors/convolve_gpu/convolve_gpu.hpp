@@ -20,6 +20,7 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <chrono>
 
 struct MetalContext {
     MTL::Device* device = nullptr;
@@ -69,14 +70,6 @@ struct MetalContext {
     }
 };
 
-inline void warmup_gpu() {
-    try {
-        MetalContext::get();
-    } catch (const std::exception& e) {
-        throw std::runtime_error("GPU Warmup failed");
-    }
-}
-
 template <int Radius, int ChunkSize>
 void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KSizeConst = 2 * Radius + 1;
@@ -105,6 +98,8 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
         convolutionKernel.size() * sizeof(float),
         MTL::ResourceStorageModeShared
     );
+    
+    NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
 
     MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
     MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
@@ -129,10 +124,83 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
+    
+    pool->release();
 
     dataBuffer->release();
     outBuffer->release();
     kernelBuffer->release();
+}
+
+template <int Radius, int ChunkSize>
+void warmup_gpu() {
+    try {
+        std::cout << "GPU warm-up ..." << std::endl;
+        const auto start = std::chrono::high_resolution_clock::now();
+
+        MetalContext& ctx = MetalContext::get();
+
+        constexpr size_t DUMMY_SIZE = 1024 * 1024 * 2;
+        constexpr size_t KSizeConst = 2 * Radius + 1;
+        
+        uint32_t KernelSize = (uint32_t)KSizeConst;
+        uint32_t rawDataSize = (uint32_t)DUMMY_SIZE;
+        uint32_t outSize = (uint32_t)(DUMMY_SIZE - KSizeConst + 1);
+        
+        MTL::Buffer* dataBuffer = ctx.device->newBuffer(DUMMY_SIZE * sizeof(float), MTL::ResourceStorageModeShared);
+        MTL::Buffer* outBuffer  = ctx.device->newBuffer(DUMMY_SIZE * sizeof(float), MTL::ResourceStorageModeShared);
+        MTL::Buffer* kernelBuffer = ctx.device->newBuffer((2 * Radius + 1) * sizeof(float), MTL::ResourceStorageModeShared);
+
+        memset(dataBuffer->contents(), 0, DUMMY_SIZE * sizeof(float));
+        memset(outBuffer->contents(), 0, DUMMY_SIZE * sizeof(float));
+        
+        float* rawKernel = static_cast<float*>(kernelBuffer->contents());
+        for(int i = 0; i < (2 * Radius + 1); ++i) {
+            rawKernel[i] = 0.01f;
+        }
+
+        for (int i = 0; i < 100; ++i) {
+            NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
+
+            MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
+            MTL::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
+
+            encoder->setComputePipelineState(ctx.pipelineState);
+            encoder->setBuffer(dataBuffer, 0, 0);
+            encoder->setBuffer(outBuffer, 0, 1);
+            encoder->setBuffer(kernelBuffer, 0, 2);
+            encoder->setBytes(&KernelSize, sizeof(uint32_t), 3);
+            encoder->setBytes(&outSize, sizeof(uint32_t), 4);
+            encoder->setBytes(&rawDataSize, sizeof(uint32_t), 5);
+            
+            NS::UInteger threadgroupMemSize = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * sizeof(float);
+            encoder->setThreadgroupMemoryLength(threadgroupMemSize, 0);
+
+            NS::UInteger numGroups = (outSize + TILE_SIZE - 1) / TILE_SIZE;
+            MTL::Size groupSize = MTL::Size::Make(THREADS_PER_GROUP, 1, 1);
+            MTL::Size gridSize = MTL::Size::Make(numGroups * THREADS_PER_GROUP, 1, 1);
+            
+            encoder->dispatchThreads(gridSize, groupSize);
+            encoder->endEncoding();
+            
+            commandBuffer->commit();
+            commandBuffer->waitUntilCompleted();
+            
+            pool->release();
+        }
+        
+        dataBuffer->release();
+        outBuffer->release();
+        kernelBuffer->release();
+
+        const auto end = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Warm-up took " << elapsed.count() << " seconds" << std::endl;
+        std::cout << "----------------------------------------\n";
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("GPU Warmup failed: " + std::string(e.what()));
+    }
 }
 
 #endif // CONVOLVE_GPU_HPP

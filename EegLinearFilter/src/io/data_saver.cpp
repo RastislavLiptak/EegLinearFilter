@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <iomanip>
 
+//TODO - ulož filtrovaná data
+
 void save_data(const NeonVector& data, const std::string& filepath, const std::vector<float>& convolutionKernel) {
     const size_t convolutionKernelSize = convolutionKernel.size();
     

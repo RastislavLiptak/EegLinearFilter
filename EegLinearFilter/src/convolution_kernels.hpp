@@ -19,7 +19,7 @@ std::vector<float> create_gaussian_kernel(const float sigma) {
         throw std::runtime_error("Gaussian kernel sigma must be positive");
     }
     
-    std::cout << "Generating a convolution kernel..."<< std::endl;
+    std::cout << "Convolution kernel: Gaussian"<< std::endl;
     
     constexpr size_t size = 2 * Radius + 1;
     std::vector<float> kernel(size);
