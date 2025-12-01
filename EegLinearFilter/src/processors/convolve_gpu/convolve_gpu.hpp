@@ -133,8 +133,10 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
 }
 
 void warmup_gpu() {
+    static bool is_warmed_up = false;
+    if (is_warmed_up) return;
+    
     try {
-        std::cout << "GPU warm-up ..." << std::endl;
         const auto start = std::chrono::high_resolution_clock::now();
 
         MetalContext& ctx = MetalContext::get();
@@ -195,12 +197,13 @@ void warmup_gpu() {
 
         const auto end = std::chrono::high_resolution_clock::now();
         const std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Warm-up took " << elapsed.count() << " seconds" << std::endl;
-        std::cout << "----------------------------------------\n";
+        std::cout << "GPU warm-up took " << elapsed.count() << " seconds" << std::endl;
         
     } catch (const std::exception& e) {
         throw std::runtime_error("GPU Warmup failed: " + std::string(e.what()));
     }
+    
+    is_warmed_up = true;
 }
 
 #endif // CONVOLVE_GPU_HPP
