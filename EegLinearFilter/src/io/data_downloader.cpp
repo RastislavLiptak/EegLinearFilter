@@ -11,8 +11,25 @@
 #include <curl/curl.h>
 #include <filesystem>
 #include <iomanip>
+#include <sstream>
+#include <cmath>
 
 namespace fs = std::filesystem;
+
+std::string format_bytes(curl_off_t bytes) {
+    const char* suffixes[] = {"B", "KB", "MB", "GB", "TB"};
+    int suffix_index = 0;
+    double count = static_cast<double>(bytes);
+
+    while (count >= 1024 && suffix_index < 4) {
+        count /= 1024;
+        suffix_index++;
+    }
+
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2) << count << " " << suffixes[suffix_index];
+    return ss.str();
+}
 
 size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
     size_t written = fwrite(ptr, size, nmemb, stream);
@@ -38,7 +55,7 @@ int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_
     for (int i = 0; i < barWidth; ++i) {
         std::cout << (i < pos ? "█" : " ");
     }
-    std::cout << "] " << std::setw(3) << percentage << "%";
+    std::cout << "] " << std::setw(3) << percentage << "% " << "(" << format_bytes(dlnow) << " / " << format_bytes(dltotal) << ")";
     std::cout.flush();
 
     return 0;
