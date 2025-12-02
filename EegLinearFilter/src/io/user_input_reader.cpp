@@ -5,8 +5,6 @@
 //  Created by Rastislav Lipták on 01.12.2025.
 //
 
-//TODO - pokud soubor EegLinearFilter/data/PN01-1.edf neexistuje, stáhni ho
-
 #include "io.hpp"
 #include <limits>
 #include <optional>
@@ -20,7 +18,9 @@
 
 namespace fs = std::filesystem;
 
-const std::string DEFAULT_FILE = "EegLinearFilter/data/PN01-1.edf";
+//TODO - tohle by možná chtělo dát do konfigurace
+const std::string DEFAULT_FILE_PATH = "EegLinearFilter/data/PN01-1.edf";
+const std::string DEFAULT_FILE_DOWNLOAD_URL = "https://physionet-open.s3.amazonaws.com/siena-scalp-eeg/1.0.0/PN01/PN01-1.edf?download";
 const int DEFAULT_ITERATIONS = 10;
 const bool DEFAULT_SAVE = false;
 const std::string DEFAULT_OUT_DIR = "EegLinearFilter/out/";
@@ -113,8 +113,22 @@ bool can_write_to_dir(const fs::path& path) {
 
 std::optional<std::string> try_parse_filepath(const std::string& input) {
     std::string clean_input = trim(input);
+    bool use_default = clean_input.empty();
     
-    fs::path path = clean_input.empty() ? DEFAULT_FILE : clean_input;
+    if (use_default) {
+        fs::path path(DEFAULT_FILE_PATH);
+        if (!fs::exists(path)) {
+            std::cout << "The default file is not stored locally.\n";
+            std::cout << "Downloading from " << DEFAULT_FILE_DOWNLOAD_URL << "..." << std::endl;
+            
+            if (!download_file(DEFAULT_FILE_DOWNLOAD_URL, DEFAULT_FILE_PATH)) {
+                std::cout << "Error: Default file download failed." << std::endl;
+                return std::nullopt;
+            }
+        }
+    }
+
+    fs::path path = use_default ? DEFAULT_FILE_PATH : clean_input;
 
     std::error_code ec;
     if (!fs::exists(path, ec)) {
@@ -238,7 +252,7 @@ StepResult get_input_file_path(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Enter path to the input EDF file:\n";
-        std::cout << "(Default: " << DEFAULT_FILE << ")\n";
+        std::cout << "(Default: " << DEFAULT_FILE_PATH << ")\n";
         if (!read_input(input_buffer)) return StepResult::BACK;
 
         if (auto result = try_parse_filepath(input_buffer)) {
