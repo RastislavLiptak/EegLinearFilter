@@ -368,3 +368,21 @@ AppConfig read_user_input() {
     print_starting_message();
     return config;
 }
+
+bool ask_to_continue() {
+    std::string input_buffer;
+    while (true) {
+        std::cout << "Do you want to run another benchmark? (y/n):\n";
+        read_input(input_buffer);
+        
+        std::string clean_input = trim(input_buffer);
+
+        if (clean_input.length() == 1) {
+            char response = std::tolower(clean_input[0]);
+            if (response == 'y') return true;
+            if (response == 'n') return false;
+        }
+
+        std::cout << "Invalid input. Please enter 'y' or 'n'." << std::endl;
+    }
+}

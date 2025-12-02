@@ -25,29 +25,36 @@ void print_welcome_banner() {
 
 int main(int argc, const char * argv[]) {
     print_welcome_banner();
-    AppConfig config = read_user_input();
     
-    try {
-        const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
-        NeonVector allData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
+    bool keepRunning = true;
+    do {
+        AppConfig config = read_user_input();
         
-        if (config.runAllVariants) {
-            std::cout << "Starting benchmark suite" << std::endl;
-            std::cout << "========================================\n";
+        try {
+            const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
+            NeonVector allData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
             
-            for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
-                NeonVector workingData = allData;
-                run_benchmark(static_cast<ProcessingMode>(i), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
+            if (config.runAllVariants) {
+                std::cout << "Starting benchmark suite" << std::endl;
+                std::cout << "========================================\n";
+                
+                for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
+                    NeonVector workingData = allData;
+                    run_benchmark(static_cast<ProcessingMode>(i), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
+                }
+            } else {
+                run_benchmark(config.mode.value(), allData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
             }
-        } else {
-            run_benchmark(config.mode.value(), allData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
+            
+            keepRunning = ask_to_continue();
+            
+        } catch (const std::exception& e) {
+            std::cerr << "\nCRITICAL ERROR: Data processing failed.\nDetails: " << e.what() << std::endl;
+            return EXIT_FAILURE;
         }
         
-    } catch (const std::exception& e) {
-        std::cerr << "\nCRITICAL ERROR: Data processing failed.\nDetails: " << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+    } while (keepRunning);
     
-//    TODO - zeptat se, jestli chce uživatel pokračovat nebo ne
+    std::cout << "Exiting application. Goodbye!" << std::endl;
     return EXIT_SUCCESS;
 }
