@@ -18,14 +18,6 @@
 
 namespace fs = std::filesystem;
 
-//TODO - tohle by možná chtělo dát do konfigurace
-const std::string DEFAULT_FILE_PATH = "EegLinearFilter/data/PN01-1.edf";
-const std::string DEFAULT_FILE_DOWNLOAD_URL = "https://physionet-open.s3.amazonaws.com/siena-scalp-eeg/1.0.0/PN01/PN01-1.edf?download";
-const int DEFAULT_ITERATIONS = 10;
-const bool DEFAULT_SAVE = false;
-const std::string DEFAULT_OUT_DIR = "EegLinearFilter/out/";
-const int DEFAULT_MODE_INDEX = -1;
-
 enum class StepResult {
     NEXT,
     BACK

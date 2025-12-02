@@ -9,7 +9,7 @@
 #define IO_HPP
 
 #include <string>
-#include "config.h"
+#include "../config.h"
 #include "../data_types.hpp"
 #include "../../lib/edflib/edflib.h"
 

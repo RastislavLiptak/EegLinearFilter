@@ -27,6 +27,14 @@ enum class ProcessingMode {
     COUNT
 };
 
+// --- Default app config ---
+#define DEFAULT_FILE_PATH "EegLinearFilter/data/PN01-1.edf"
+#define DEFAULT_FILE_DOWNLOAD_URL "https://physionet-open.s3.amazonaws.com/siena-scalp-eeg/1.0.0/PN01/PN01-1.edf?download"
+#define DEFAULT_ITERATIONS 10
+#define DEFAULT_SAVE false
+#define DEFAULT_OUT_DIR "EegLinearFilter/out/"
+#define DEFAULT_MODE_INDEX -1
+
 // --- Convolution kernel parameters ---
 #define KERNEL_RADIUS 256
 #define KERNEL_SIGMA 1.0f
