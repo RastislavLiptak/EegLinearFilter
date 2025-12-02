@@ -244,7 +244,7 @@ StepResult get_input_file_path(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Enter path to the input EDF file:\n";
-        std::cout << "(Default: " << DEFAULT_FILE_PATH << ")\n";
+        std::cout << "(Default: " << DEFAULT_FILE_DATASET_NAME << ")\n";
         if (!read_input(input_buffer)) return StepResult::BACK;
 
         if (auto result = try_parse_filepath(input_buffer)) {
