@@ -56,9 +56,7 @@ void print_legend() {
 
 void print_starting_message() {
     std::cout << "========================================\n";
-    std::cout << "                                        \n";
     std::cout << "Configuration complete. Starting...     \n";
-    std::cout << "                                        \n";
     std::cout << "========================================\n";
 }
 
