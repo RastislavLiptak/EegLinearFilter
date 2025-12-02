@@ -1,5 +1,5 @@
 //
-//  user_input.cpp
+//  user_input_reader.cpp
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 01.12.2025.
@@ -13,7 +13,12 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <cctype>
 #include "../../lib/magic_enum/magic_enum.hpp"
+
+namespace fs = std::filesystem;
 
 const std::string DEFAULT_FILE = "EegLinearFilter/data/PN01-1.edf";
 const int DEFAULT_ITERATIONS = 10;
@@ -35,6 +40,21 @@ enum class ConfigStep {
     FINISHED
 };
 
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+std::string trim(const std::string& str) {
+    const auto strBegin = str.find_first_not_of(" \t");
+    if (strBegin == std::string::npos)
+        return "";
+
+    const auto strEnd = str.find_last_not_of(" \t");
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
+
 void print_legend() {
     std::cout << "Controls:" << std::endl;
     std::cout << " [ENTER]: Confirm default value" << std::endl;
@@ -53,73 +73,160 @@ void print_starting_message() {
 bool read_input(std::string& buffer) {
     std::cout << "> ";
     std::getline(std::cin, buffer);
-    return buffer != "b";
+    std::string trimmed = trim(buffer);
+    return trimmed != "b";
 }
 
+std::optional<int> parse_strict_int(const std::string& input) {
+    if (input.find('.') != std::string::npos || input.find(',') != std::string::npos) {
+        return std::nullopt;
+    }
+
+    size_t processed_chars = 0;
+    try {
+        int val = std::stoi(input, &processed_chars);
+        
+        if (processed_chars != input.length()) {
+            return std::nullopt;
+        }
+        return val;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+bool can_write_to_dir(const fs::path& path) {
+    fs::path test_file = path / "tmp_write_test.tmp";
+    std::ofstream f(test_file);
+    if (f.is_open()) {
+        f.close();
+        std::error_code ec;
+        fs::remove(test_file, ec);
+        return true;
+    }
+    return false;
+}
 
 // ==========================================
 // VALIDATION LOGIC
 // ==========================================
 
 std::optional<std::string> try_parse_filepath(const std::string& input) {
-    if (input.empty()) return DEFAULT_FILE;
+    std::string clean_input = trim(input);
     
-    return input;
+    fs::path path = clean_input.empty() ? DEFAULT_FILE : clean_input;
+
+    std::error_code ec;
+    if (!fs::exists(path, ec)) {
+        std::cout << "Error: File does not exist: " << path << std::endl;
+        return std::nullopt;
+    }
+
+    if (fs::is_directory(path, ec)) {
+        std::cout << "Error: Path is a directory, not a file." << std::endl;
+        return std::nullopt;
+    }
+
+    if (path.extension() != ".edf") {
+        std::cout << "Error: File must have .edf extension." << std::endl;
+        return std::nullopt;
+    }
+    
+    return path.string();
 }
 
 std::optional<int> try_parse_mode(const std::string& input) {
-    if (input.empty()) return DEFAULT_MODE_INDEX;
+    std::string clean_input = trim(input);
+    if (clean_input.empty()) return DEFAULT_MODE_INDEX;
 
-    try {
-        int val = std::stoi(input);
-        
+    auto val_opt = parse_strict_int(clean_input);
+
+    if (val_opt.has_value()) {
+        int val = val_opt.value();
         if (val == -1 || (val >= 0 && val < (int)ProcessingMode::COUNT)) {
             return val;
         } else {
-            std::cout << "Invalid selection. Enter a number between -1 and " << ((int)ProcessingMode::COUNT - 1) << "." << std::endl;
+             std::cout << "Invalid selection. Enter a number between -1 and " << ((int)ProcessingMode::COUNT - 1) << "." << std::endl;
+             return std::nullopt;
         }
-    } catch (...) {
-        std::cout << "Invalid input. Please enter a number." << std::endl;
     }
+
+    std::cout << "Invalid input. Please enter a valid integer (no decimals, no extra characters)." << std::endl;
     return std::nullopt;
 }
 
 std::optional<int> try_parse_iterations(const std::string& input) {
-    if (input.empty()) return DEFAULT_ITERATIONS;
+    std::string clean_input = trim(input);
+    if (clean_input.empty()) return DEFAULT_ITERATIONS;
 
-    try {
-        int val = std::stoi(input);
+    auto val_opt = parse_strict_int(clean_input);
+
+    if (val_opt.has_value()) {
+        int val = val_opt.value();
         if (val > 0) return val;
         std::cout << "Number must be positive." << std::endl;
-    } catch (...) {
-        std::cout << "Invalid input. Please enter an integer." << std::endl;
+        return std::nullopt;
     }
+
+    std::cout << "Invalid input. Please enter a valid integer." << std::endl;
     return std::nullopt;
 }
 
 std::optional<bool> try_parse_save_pref(const std::string& input) {
-    if (input.empty()) return DEFAULT_SAVE;
+    std::string clean_input = trim(input);
+    if (clean_input.empty()) return DEFAULT_SAVE;
 
-    char response = std::tolower(input[0]);
-    if (response == 'y') return true;
-    if (response == 'n') return false;
+    if (clean_input.length() == 1) {
+        char response = std::tolower(clean_input[0]);
+        if (response == 'y') return true;
+        if (response == 'n') return false;
+    }
 
     std::cout << "Invalid input. Please enter 'y' or 'n'." << std::endl;
     return std::nullopt;
 }
 
 std::optional<std::string> try_parse_output_dir(const std::string& input) {
-    std::string path = input.empty() ? DEFAULT_OUT_DIR : input;
+    std::string clean_input = trim(input);
+    std::string path_str = clean_input.empty() ? DEFAULT_OUT_DIR : clean_input;
 
-    if (path.empty()) {
+    if (path_str.empty()) {
         std::cout << "Error: Output path cannot be empty." << std::endl;
         return std::nullopt;
     }
 
-    if (path.back() != '/' && path.back() != '\\') {
-        path += "/";
+    if (path_str.back() != '/' && path_str.back() != '\\') {
+        path_str += "/";
     }
-    return path;
+    
+    fs::path path(path_str);
+    std::error_code ec;
+
+    if (fs::exists(path, ec)) {
+        if (!fs::is_directory(path, ec)) {
+            std::cout << "Error: Path exists but it is a file, not a directory." << std::endl;
+            return std::nullopt;
+        }
+
+        if (!can_write_to_dir(path)) {
+            std::cout << "Error: Directory exists, but is not writable (permission denied)." << std::endl;
+            return std::nullopt;
+        }
+    } else {
+        if (!fs::create_directories(path, ec)) {
+            if (ec) {
+                std::cout << "Error: Cannot create directory. Reason: " << ec.message() << std::endl;
+                return std::nullopt;
+            }
+        }
+        
+        if (!can_write_to_dir(path)) {
+             std::cout << "Error: Created directory, but cannot write to it." << std::endl;
+             return std::nullopt;
+        }
+    }
+
+    return path_str;
 }
 
 
@@ -208,7 +315,7 @@ StepResult get_output_folder(AppConfig& config) {
     }
 }
 
-AppConfig configure_app() {
+AppConfig read_user_input() {
     AppConfig config;
     print_legend();
 

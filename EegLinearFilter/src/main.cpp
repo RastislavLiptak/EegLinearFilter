@@ -25,7 +25,7 @@ void print_welcome_banner() {
 
 int main(int argc, const char * argv[]) {
     print_welcome_banner();
-    AppConfig config = configure_app();
+    AppConfig config = read_user_input();
     
     try {
         const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
@@ -48,5 +48,6 @@ int main(int argc, const char * argv[]) {
         return EXIT_FAILURE;
     }
     
+//    TODO - zeptat se, jestli chce uživatel pokračovat nebo ne
     return EXIT_SUCCESS;
 }
