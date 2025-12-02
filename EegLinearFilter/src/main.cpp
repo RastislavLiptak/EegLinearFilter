@@ -13,7 +13,7 @@
 #include "convolution_kernels.hpp"
 #include "config.h"
 
-void show_welcome_banner() {
+void print_welcome_banner() {
     std::cout << "========================================" << std::endl;
     std::cout << "                                        " << std::endl;
     std::cout << "              Welcome to                " << std::endl;
@@ -24,7 +24,7 @@ void show_welcome_banner() {
 }
 
 int main(int argc, const char * argv[]) {
-    show_welcome_banner();
+    print_welcome_banner();
     AppConfig config = configure_app();
     
     try {

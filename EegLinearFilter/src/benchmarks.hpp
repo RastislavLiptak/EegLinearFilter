@@ -54,9 +54,7 @@ void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::
         const std::chrono::duration<double> execution_time = run_processor<KERNEL_RADIUS, CHUNK_SIZE>(mode, *workingDataPtr, convolutionKernel);
         
         double time_sec = execution_time.count();
-        if (benchmark_iteration_count > 1) {
-            std::cout << "Run " << (i + 1) << " took " << time_sec << " seconds\n";
-        }
+        std::cout << "Run " << (i + 1) << " took " << time_sec << " seconds\n";
         execution_times[i] = time_sec;
     }
     

@@ -5,7 +5,6 @@
 //  Created by Rastislav Lipták on 01.12.2025.
 //
 
-//TODO - zvaliduj správně data
 //TODO - pokud soubor EegLinearFilter/data/PN01-1.edf neexistuje, stáhni ho
 
 #include "io.hpp"
@@ -43,63 +42,126 @@ void print_legend() {
     std::cout << "----------------------------------------\n";
 }
 
+void print_starting_message() {
+    std::cout << "========================================\n";
+    std::cout << "                                        \n";
+    std::cout << "Configuration complete. Starting...     \n";
+    std::cout << "                                        \n";
+    std::cout << "========================================\n";
+}
+
+bool read_input(std::string& buffer) {
+    std::cout << "> ";
+    std::getline(std::cin, buffer);
+    return buffer != "b";
+}
+
+
+// ==========================================
+// VALIDATION LOGIC
+// ==========================================
+
+std::optional<std::string> try_parse_filepath(const std::string& input) {
+    if (input.empty()) return DEFAULT_FILE;
+    
+    return input;
+}
+
+std::optional<int> try_parse_mode(const std::string& input) {
+    if (input.empty()) return DEFAULT_MODE_INDEX;
+
+    try {
+        int val = std::stoi(input);
+        
+        if (val == -1 || (val >= 0 && val < (int)ProcessingMode::COUNT)) {
+            return val;
+        } else {
+            std::cout << "Invalid selection. Enter a number between -1 and " << ((int)ProcessingMode::COUNT - 1) << "." << std::endl;
+        }
+    } catch (...) {
+        std::cout << "Invalid input. Please enter a number." << std::endl;
+    }
+    return std::nullopt;
+}
+
+std::optional<int> try_parse_iterations(const std::string& input) {
+    if (input.empty()) return DEFAULT_ITERATIONS;
+
+    try {
+        int val = std::stoi(input);
+        if (val > 0) return val;
+        std::cout << "Number must be positive." << std::endl;
+    } catch (...) {
+        std::cout << "Invalid input. Please enter an integer." << std::endl;
+    }
+    return std::nullopt;
+}
+
+std::optional<bool> try_parse_save_pref(const std::string& input) {
+    if (input.empty()) return DEFAULT_SAVE;
+
+    char response = std::tolower(input[0]);
+    if (response == 'y') return true;
+    if (response == 'n') return false;
+
+    std::cout << "Invalid input. Please enter 'y' or 'n'." << std::endl;
+    return std::nullopt;
+}
+
+std::optional<std::string> try_parse_output_dir(const std::string& input) {
+    std::string path = input.empty() ? DEFAULT_OUT_DIR : input;
+
+    if (path.empty()) {
+        std::cout << "Error: Output path cannot be empty." << std::endl;
+        return std::nullopt;
+    }
+
+    if (path.back() != '/' && path.back() != '\\') {
+        path += "/";
+    }
+    return path;
+}
+
+
+// ==========================================
+// NAVIGATION LOGIC
+// ==========================================
+
 StepResult get_input_file_path(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Enter path to the input EDF file:\n";
-        std::cout << "(Default: " << DEFAULT_FILE << ")\n> ";
-        
-        std::getline(std::cin, input_buffer);
+        std::cout << "(Default: " << DEFAULT_FILE << ")\n";
+        if (!read_input(input_buffer)) return StepResult::BACK;
 
-        if (input_buffer == "b") return StepResult::BACK;
-
-        if (input_buffer.empty()) {
-            config.filePath = DEFAULT_FILE;
+        if (auto result = try_parse_filepath(input_buffer)) {
+            config.filePath = *result;
             return StepResult::NEXT;
         }
-
-        config.filePath = input_buffer;
-        return StepResult::NEXT;
     }
 }
 
 StepResult set_processing_mode(AppConfig& config) {
     std::cout << "Select benchmark mode:" << std::endl;
     std::cout << "-1 - WHOLE_BENCHMARK_SUITE (Default)" << std::endl;
-    
     for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
-        auto mode_enum = static_cast<ProcessingMode>(i);
-        std::cout << " " << i << " - " << magic_enum::enum_name(mode_enum) << std::endl;
+        std::cout << " " << i << " - " << magic_enum::enum_name(static_cast<ProcessingMode>(i)) << std::endl;
     }
 
     std::string input_buffer;
     while (true) {
-        std::cout << "> ";
-        std::getline(std::cin, input_buffer);
+        if (!read_input(input_buffer)) return StepResult::BACK;
 
-        if (input_buffer == "b") return StepResult::BACK;
-
-        int selected_mode = DEFAULT_MODE_INDEX;
-
-        if (!input_buffer.empty()) {
-            try {
-                selected_mode = std::stoi(input_buffer);
-            } catch (...) {
-                std::cout << "Invalid input. Please enter a number." << std::endl;
-                continue;
+        if (auto result = try_parse_mode(input_buffer)) {
+            int mode_index = *result;
+            if (mode_index == -1) {
+                config.runAllVariants = true;
+                config.mode = std::nullopt;
+            } else {
+                config.runAllVariants = false;
+                config.mode = static_cast<ProcessingMode>(mode_index);
             }
-        }
-
-        if (selected_mode == -1) {
-            config.runAllVariants = true;
-            config.mode = std::nullopt;
             return StepResult::NEXT;
-        } else if (selected_mode >= 0 && selected_mode < (int)ProcessingMode::COUNT) {
-            config.runAllVariants = false;
-            config.mode = static_cast<ProcessingMode>(selected_mode);
-            return StepResult::NEXT;
-        } else {
-            std::cout << "Invalid selection. Enter a number between -1 and " << ((int)ProcessingMode::COUNT - 1) << "." << std::endl;
         }
     }
 }
@@ -108,27 +170,12 @@ StepResult get_iteration_count(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Enter number of benchmark iterations\n";
-        std::cout << "(Default: " << DEFAULT_ITERATIONS << ")\n> ";
-        
-        std::getline(std::cin, input_buffer);
-        
-        if (input_buffer == "b") return StepResult::BACK;
+        std::cout << "(Default: " << DEFAULT_ITERATIONS << ")\n";
+        if (!read_input(input_buffer)) return StepResult::BACK;
 
-        if (input_buffer.empty()) {
-            config.iterationCount = DEFAULT_ITERATIONS;
+        if (auto result = try_parse_iterations(input_buffer)) {
+            config.iterationCount = *result;
             return StepResult::NEXT;
-        }
-
-        try {
-            int val = std::stoi(input_buffer);
-            if (val > 0) {
-                config.iterationCount = val;
-                return StepResult::NEXT;
-            } else {
-                std::cout << "Number must be positive." << std::endl;
-            }
-        } catch (...) {
-            std::cout << "Invalid input. Please enter an integer." << std::endl;
         }
     }
 }
@@ -137,28 +184,13 @@ StepResult get_save_preference(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Do you want to save the results? (y/n):\n";
-        std::cout << "(Default n)\n> ";
-        
-        std::getline(std::cin, input_buffer);
+        std::cout << "(Default n)\n";
+        if (!read_input(input_buffer)) return StepResult::BACK;
 
-        if (input_buffer == "b") return StepResult::BACK;
-
-        if (input_buffer.empty()) {
-            config.saveResults = DEFAULT_SAVE;
+        if (auto result = try_parse_save_pref(input_buffer)) {
+            config.saveResults = *result;
             return StepResult::NEXT;
         }
-
-        char response = std::tolower(input_buffer[0]);
-        if (response == 'y') {
-            config.saveResults = true;
-            return StepResult::NEXT;
-        }
-        if (response == 'n') {
-            config.saveResults = false;
-            return StepResult::NEXT;
-        }
-
-        std::cout << "Invalid input. Please enter 'y' or 'n'." << std::endl;
     }
 }
 
@@ -166,22 +198,13 @@ StepResult get_output_folder(AppConfig& config) {
     std::string input_buffer;
     while (true) {
         std::cout << "Enter output folder path:\n";
-        std::cout << "(Default: " << DEFAULT_OUT_DIR << "):\n> ";
-        
-        std::getline(std::cin, input_buffer);
+        std::cout << "(Default: " << DEFAULT_OUT_DIR << "):\n";
+        if (!read_input(input_buffer)) return StepResult::BACK;
 
-        if (input_buffer == "b") return StepResult::BACK;
-
-        std::string path = input_buffer.empty() ? DEFAULT_OUT_DIR : input_buffer;
-
-        if (!path.empty()) {
-            if (path.back() != '/' && path.back() != '\\') {
-                path += "/";
-            }
-            config.outputFolderPath = path;
+        if (auto result = try_parse_output_dir(input_buffer)) {
+            config.outputFolderPath = *result;
             return StepResult::NEXT;
         }
-        std::cout << "Error: Output path cannot be empty." << std::endl;
     }
 }
 
@@ -206,24 +229,20 @@ AppConfig configure_app() {
 
             case ConfigStep::MODE_SELECT:
                 result = set_processing_mode(config);
-                if (result == StepResult::NEXT) currentStep = ConfigStep::ITERATIONS;
-                else currentStep = ConfigStep::FILE_INPUT;
+                currentStep = (result == StepResult::NEXT) ? ConfigStep::ITERATIONS : ConfigStep::FILE_INPUT;
                 break;
 
             case ConfigStep::ITERATIONS:
                 result = get_iteration_count(config);
-                if (result == StepResult::NEXT) currentStep = ConfigStep::SAVE_PREF;
-                else currentStep = ConfigStep::MODE_SELECT;
+                currentStep = (result == StepResult::NEXT) ? ConfigStep::SAVE_PREF : ConfigStep::MODE_SELECT;
                 break;
 
             case ConfigStep::SAVE_PREF:
                 result = get_save_preference(config);
                 if (result == StepResult::NEXT) {
-                    if (config.saveResults) {
-                        currentStep = ConfigStep::OUT_DIR;
-                    } else {
+                    currentStep = config.saveResults ? ConfigStep::OUT_DIR : ConfigStep::FINISHED;
+                    if (!config.saveResults) {
                         config.outputFolderPath = "";
-                        currentStep = ConfigStep::FINISHED;
                     }
                 } else {
                     currentStep = ConfigStep::ITERATIONS;
@@ -232,20 +251,13 @@ AppConfig configure_app() {
 
             case ConfigStep::OUT_DIR:
                 result = get_output_folder(config);
-                if (result == StepResult::NEXT) currentStep = ConfigStep::FINISHED;
-                else currentStep = ConfigStep::SAVE_PREF;
+                currentStep = (result == StepResult::NEXT) ? ConfigStep::FINISHED : ConfigStep::SAVE_PREF;
                 break;
                 
-            case ConfigStep::FINISHED:
-                break;
+            case ConfigStep::FINISHED: break;
         }
     }
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "                                        " << std::endl;
-    std::cout << "Configuration complete. Starting..." << std::endl;
-    std::cout << "                                        " << std::endl;
-    std::cout << "========================================" << std::endl;
-    
+    print_starting_message();
     return config;
 }
