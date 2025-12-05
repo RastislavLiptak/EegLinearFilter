@@ -99,6 +99,4 @@ void save_data(const NeonVector& processedData, const std::string& filepath, con
     }
     
     edfclose_file(handle);
-    std::cout << "Done!" << std::endl;
-    std::cout << "========================================\n";
 }

@@ -46,6 +46,8 @@ int main(int argc, const char * argv[]) {
                 run_benchmark(config.mode.value(), loadedData.samples, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
             }
             
+            std::cout << "Done!" << std::endl;
+            std::cout << "========================================\n";
             keepRunning = ask_to_continue();
             
         } catch (const std::exception& e) {
