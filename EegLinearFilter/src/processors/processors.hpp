@@ -19,7 +19,7 @@ std::chrono::duration<double> run_processor(const ProcessingMode mode, NeonVecto
     
     NeonVector outputBuffer(allData.size(), 0.0f);
     if (mode == ProcessingMode::GPU) {
-        warmup_gpu();
+        init_gpu();
     }
     
     const auto start = std::chrono::high_resolution_clock::now();
