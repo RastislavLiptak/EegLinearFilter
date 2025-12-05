@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <new>
 #include <vector>
+#include <string>
+#include <optional>
 #include <cstddef>
 
 struct AppConfig {
@@ -20,6 +22,27 @@ struct AppConfig {
     int iterationCount;
     bool saveResults;
     std::string outputFolderPath;
+};
+
+struct EdfChannelParams {
+    std::string label;
+    std::string dimension;
+    std::string transducer;
+    std::string prefilter;
+    double phys_min;
+    double phys_max;
+    int dig_min;
+    int dig_max;
+    int smp_in_datarecord;
+};
+
+struct EdfHeaderInfo {
+    std::string patient;
+    std::string recording;
+    int startdate_day, startdate_month, startdate_year;
+    int starttime_hour, starttime_minute, starttime_second;
+    long data_record_duration;
+    int num_signals;
 };
 
 template <typename T, std::size_t Alignment>
@@ -51,5 +74,14 @@ struct aligned_allocator {
 };
 
 using NeonVector = std::vector<float, aligned_allocator<float, 4096>>;
+
+struct EdfData {
+    NeonVector samples;
+    EdfHeaderInfo header;
+    std::vector<EdfChannelParams> channels;
+    int samplesPerSignal;
+    int samplesPerSignalPadded;
+    int padding;
+};
 
 #endif // DATA_TYPES_HPP

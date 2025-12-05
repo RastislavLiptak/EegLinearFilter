@@ -4,6 +4,7 @@
 //
 //  Created by Rastislav Lipták on 01.12.2025.
 //
+
 #ifndef BENCHMARKS_HPP
 #define BENCHMARKS_HPP
 
@@ -33,7 +34,7 @@ void calc_benchmarks(std::vector<double> execution_times, size_t dataSize) {
     std::cout << "========================================\n";
 }
 
-void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath) {
+void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath, const EdfData& originalData) {
     std::cout << "Mode: " << magic_enum::enum_name(mode) << std::endl;
     std::cout << "----------------------------------------\n";
     
@@ -61,8 +62,8 @@ void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::
     calc_benchmarks<KERNEL_RADIUS>(execution_times, dataSize);
     
     if (save_results) {
-        std::string outputFilename = outputFolderPath + std::string(magic_enum::enum_name(mode)) + ".txt";
-        save_data(*workingDataPtr, outputFilename, convolutionKernel);
+        std::string outputFilename = outputFolderPath + std::string(magic_enum::enum_name(mode)) + ".edf";
+        save_data(*workingDataPtr, outputFilename, convolutionKernel, originalData);
         
         if (benchmark_iteration_count > 1) {
             tempData.clear();

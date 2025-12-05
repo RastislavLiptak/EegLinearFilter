@@ -32,18 +32,18 @@ int main(int argc, const char * argv[]) {
         
         try {
             const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
-            NeonVector allData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
+            EdfData loadedData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
             
             if (config.runAllVariants) {
                 std::cout << "Starting benchmark suite" << std::endl;
                 std::cout << "========================================\n";
                 
                 for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
-                    NeonVector workingData = allData;
-                    run_benchmark(static_cast<ProcessingMode>(i), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
+                    NeonVector workingData = loadedData.samples;
+                    run_benchmark(static_cast<ProcessingMode>(i), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
                 }
             } else {
-                run_benchmark(config.mode.value(), allData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
+                run_benchmark(config.mode.value(), loadedData.samples, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
             }
             
             keepRunning = ask_to_continue();
