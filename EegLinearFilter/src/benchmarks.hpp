@@ -22,33 +22,44 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     double sum_total_time = 0.0;
     double sum_compute_time = 0.0;
     double sum_overhead_time = 0.0;
+    double sum_cpu_mem = 0.0;
+    double sum_gpu_mem = 0.0;
 
     for (const auto& s : stats) {
         sum_total_time += s.totalTimeSec;
         sum_compute_time += s.computeTimeSec;
         sum_overhead_time += s.overheadTimeSec;
+        sum_cpu_mem += s.cpuMemoryOpsSec;
+        sum_gpu_mem += s.gpuMemoryOpsSec;
     }
 
     double avg_total_time = sum_total_time / stats.size();
     double avg_compute_time = sum_compute_time / stats.size();
     double avg_overhead_time = sum_overhead_time / stats.size();
+    double avg_cpu_mem = sum_cpu_mem / stats.size();
+    double avg_gpu_mem = sum_gpu_mem / stats.size();
 
     double megaSamplesPerSec = (outputElements / avg_total_time) / 1e6;
-
     double calc_time_for_gflops = (avg_compute_time > 1e-9) ? avg_compute_time : avg_total_time;
-    
     double totalOperations = (double)outputElements * (double)KernelSize * 2.0;
     double gigaFlops = (totalOperations / calc_time_for_gflops) / 1e9;
 
     std::cout << "----------------------------------------\n";
     std::cout << "AVG results over " << stats.size() << " runs:" << std::endl;
-    if (avg_overhead_time < 1e-9) {
-        std::cout << "Time: " << avg_total_time << "s" << std::endl;
-    } else {
-        std::cout << "Time (Total/Compute/Overhead): " << avg_total_time << "s / " << avg_compute_time << "s / " << avg_overhead_time << "s" << std::endl;
+    std::cout << "Time Breakdown:" << std::endl;
+    std::cout << "  Total: " << avg_total_time << "s" << std::endl;
+    std::cout << "  Compute: " << avg_compute_time << "s" << std::endl;
+    std::cout << "  Mem Ops: " << avg_cpu_mem << "s (CPU)" << std::endl;
+    if (avg_gpu_mem > 1e-9) {
+        std::cout << "           " << avg_gpu_mem << "s (GPU)" << std::endl;
     }
-    std::cout << "Throughput: " << megaSamplesPerSec << " MSamples/s" << std::endl;
-    std::cout << "Performance: " << gigaFlops << " GFLOPS" << std::endl;
+    if (avg_overhead_time > 1e-9) {
+        std::cout << "  Overhead: " << avg_overhead_time << "s (API/Launch)" << std::endl;
+    }
+    
+    std::cout << "Metrics:" << std::endl;
+    std::cout << "  Throughput: " << megaSamplesPerSec << " MSamples/s" << std::endl;
+    std::cout << "  Performance:" << gigaFlops << " GFLOPS" << std::endl;
     std::cout << "========================================\n";
 }
 

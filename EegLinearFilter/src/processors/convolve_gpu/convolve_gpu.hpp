@@ -81,6 +81,8 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     
     MetalContext& ctx = MetalContext::get();
 
+    auto mem_start = std::chrono::high_resolution_clock::now();
+    
     MTL::Buffer* dataBuffer = ctx.device->newBuffer(
         (void*)data.data(),
         data.size() * sizeof(float),
@@ -100,6 +102,9 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
         convolutionKernel.size() * sizeof(float),
         MTL::ResourceStorageModeShared
     );
+    
+    auto mem_end = std::chrono::high_resolution_clock::now();
+    double memoryTime = std::chrono::duration<double>(mem_end - mem_start).count();
     
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
 
@@ -127,9 +132,6 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
     
-    auto end_wall = std::chrono::high_resolution_clock::now();
-    double totalTime = std::chrono::duration<double>(end_wall - start_wall).count();
-
     double gpuStart = commandBuffer->GPUStartTime();
     double gpuEnd = commandBuffer->GPUEndTime();
     double computeTime = gpuEnd - gpuStart;
@@ -138,11 +140,25 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
 
     pool->release();
 
+    mem_start = std::chrono::high_resolution_clock::now();
+
     dataBuffer->release();
     outBuffer->release();
     kernelBuffer->release();
+    
+    mem_end = std::chrono::high_resolution_clock::now();
+    memoryTime += std::chrono::duration<double>(mem_end - mem_start).count();
+    
+    auto end_wall = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(end_wall - start_wall).count();
 
-    return { totalTime, computeTime, totalTime - computeTime };
+    return {
+        totalTime,
+        computeTime,
+        totalTime - computeTime - memoryTime,
+        0.0,
+        memoryTime
+    };
 }
 
 #endif // CONVOLVE_GPU_HPP

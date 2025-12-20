@@ -17,11 +17,14 @@
 template <int Radius, int ChunkSize>
 ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
     
+    auto mem_start = std::chrono::high_resolution_clock::now();
     NeonVector outputBuffer(allData.size(), 0.0f);
+    auto mem_end = std::chrono::high_resolution_clock::now();
+    double memoryTime = std::chrono::duration<double>(mem_end - mem_start).count();
     
     const auto start = std::chrono::high_resolution_clock::now();
     
-    ProcessingStats gpuStats = {0.0, 0.0, 0.0};
+    ProcessingStats gpuStats = {0.0, 0.0, 0.0, 0.0, 0.0};
     bool isGpu = false;
 
     switch (mode) {
@@ -63,15 +66,23 @@ ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, co
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> elapsed = end - start;
     
+    mem_start = std::chrono::high_resolution_clock::now();
+
     allData.swap(outputBuffer);
     outputBuffer.clear();
     outputBuffer.shrink_to_fit();
     
+    mem_end = std::chrono::high_resolution_clock::now();
+    memoryTime += std::chrono::duration<double>(mem_end - mem_start).count();
+    
     if (isGpu) {
+        gpuStats.cpuMemoryOpsSec += memoryTime;
+        gpuStats.totalTimeSec += memoryTime;
         return gpuStats;
     } else {
-        double total = elapsed.count();
-        return { total, total, 0.0 };
+        double compute = elapsed.count();
+        double total = compute + memoryTime;
+        return { total, compute, 0.0, memoryTime, 0.0 };
     }
 }
 

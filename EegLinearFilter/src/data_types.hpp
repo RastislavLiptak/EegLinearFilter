@@ -49,6 +49,8 @@ struct ProcessingStats {
     double totalTimeSec;
     double computeTimeSec;
     double overheadTimeSec;
+    double cpuMemoryOpsSec;
+    double gpuMemoryOpsSec;
 };
 
 template <typename T, std::size_t Alignment>
