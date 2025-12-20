@@ -13,6 +13,46 @@
 #include "../lib/magic_enum/magic_enum.hpp"
 #include <numeric>
 #include <iomanip>
+#include <fstream>
+#include <filesystem>
+#include <ctime>
+
+namespace fs = std::filesystem;
+
+template <int Radius>
+void log_benchmark_result(const std::string& mode, const std::string& filename, const int iteration, const int totalIterations, const ProcessingStats& stats) {
+    
+    if (!fs::exists(LOGS_DIR)) {
+        fs::create_directory(LOGS_DIR);
+    }
+
+    std::string csv_path = std::string(LOGS_DIR) + "/benchmark_results.csv";
+    bool file_exists = fs::exists(csv_path);
+
+    std::ofstream log_file(csv_path, std::ios::app);
+
+    if (!file_exists) {
+        log_file << "Timestamp;Mode;Filename;KernelRadius;Iteration;TotalIterations;"
+                << "TotalTimeSec;ComputeTimeSec;OverheadTimeSec;CpuMemOpsSec;GpuMemOpsSec\n";
+    }
+
+    std::time_t now = std::time(nullptr);
+    char time_buffer[100];
+    if (std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now))) {
+        log_file << time_buffer << ";"
+                << mode << ";"
+                << filename << ";"
+                << Radius << ";"
+                << iteration << ";"
+                << totalIterations << ";"
+                << std::fixed << std::setprecision(9)
+                << stats.totalTimeSec << ";"
+                << stats.computeTimeSec << ";"
+                << stats.overheadTimeSec << ";"
+                << stats.cpuMemoryOpsSec << ";"
+                << stats.gpuMemoryOpsSec << "\n";
+    }
+}
 
 template <int Radius>
 void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize) {
@@ -63,7 +103,7 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     std::cout << "========================================\n";
 }
 
-void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath, const EdfData& originalData) {
+void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, NeonVector& cleanData, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath, const EdfData& originalData) {
     std::cout << "Mode: " << magic_enum::enum_name(mode) << std::endl;
     std::cout << "----------------------------------------\n";
     
@@ -84,6 +124,13 @@ void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::
         std::cout << "Run " << (i + 1) << ": running..." << std::flush;
         
         ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE>(mode, *workingDataPtr, convolutionKernel);
+        log_benchmark_result<KERNEL_RADIUS>(
+            std::string(magic_enum::enum_name(mode)),
+            inputFilename,
+            i + 1,
+            benchmark_iteration_count,
+            stats
+        );
         
         std::cout << "\rRun " << (i + 1) << ": ";
         if (stats.overheadTimeSec < 1e-9) {

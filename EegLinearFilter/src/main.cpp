@@ -40,10 +40,10 @@ int main(int argc, const char * argv[]) {
                 
                 for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
                     NeonVector workingData = loadedData.samples;
-                    run_benchmark(static_cast<ProcessingMode>(i), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
+                    run_benchmark(static_cast<ProcessingMode>(i), fs::path(config.filePath).filename().string(), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
                 }
             } else {
-                run_benchmark(config.mode.value(), loadedData.samples, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
+                run_benchmark(config.mode.value(), fs::path(config.filePath).filename().string(), loadedData.samples, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
             }
             
             std::cout << "Done!" << std::endl;
