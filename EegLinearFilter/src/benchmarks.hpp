@@ -12,23 +12,41 @@
 #include "processors/processors.hpp"
 #include "../lib/magic_enum/magic_enum.hpp"
 #include <numeric>
+#include <iomanip>
 
 template <int Radius>
-void calc_benchmarks(std::vector<double> execution_times, size_t dataSize) {
+void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outputElements = dataSize - KernelSize + 1;
     
-    double sum_ex_time = std::accumulate(execution_times.begin(), execution_times.end(), 0.0);
-    double avg_ex_time = sum_ex_time / execution_times.size();
+    double sum_total_time = 0.0;
+    double sum_compute_time = 0.0;
+    double sum_overhead_time = 0.0;
 
-    double megaSamplesPerSec = (outputElements / avg_ex_time) / 1e6;
+    for (const auto& s : stats) {
+        sum_total_time += s.totalTimeSec;
+        sum_compute_time += s.computeTimeSec;
+        sum_overhead_time += s.overheadTimeSec;
+    }
 
+    double avg_total_time = sum_total_time / stats.size();
+    double avg_compute_time = sum_compute_time / stats.size();
+    double avg_overhead_time = sum_overhead_time / stats.size();
+
+    double megaSamplesPerSec = (outputElements / avg_total_time) / 1e6;
+
+    double calc_time_for_gflops = (avg_compute_time > 1e-9) ? avg_compute_time : avg_total_time;
+    
     double totalOperations = (double)outputElements * (double)KernelSize * 2.0;
-    double gigaFlops = (totalOperations / avg_ex_time) / 1e9;
+    double gigaFlops = (totalOperations / calc_time_for_gflops) / 1e9;
 
     std::cout << "----------------------------------------\n";
-    std::cout << "Final results:" << std::endl;
-    std::cout << "Avg Time: " << avg_ex_time << " seconds" << std::endl;
+    std::cout << "AVG results over " << stats.size() << " runs:" << std::endl;
+    if (avg_overhead_time < 1e-9) {
+        std::cout << "Time: " << avg_total_time << "s" << std::endl;
+    } else {
+        std::cout << "Time (Total/Compute/Overhead): " << avg_total_time << "s / " << avg_compute_time << "s / " << avg_overhead_time << "s" << std::endl;
+    }
     std::cout << "Throughput: " << megaSamplesPerSec << " MSamples/s" << std::endl;
     std::cout << "Performance: " << gigaFlops << " GFLOPS" << std::endl;
     std::cout << "========================================\n";
@@ -42,7 +60,7 @@ void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::
     NeonVector* workingDataPtr = nullptr;
     
     const size_t dataSize = cleanData.size();
-    std::vector<double> execution_times(benchmark_iteration_count);
+    std::vector<ProcessingStats> stats_collection(benchmark_iteration_count);
     
     for (int i = 0; i < benchmark_iteration_count; ++i) {
         if (benchmark_iteration_count == 1) {
@@ -52,14 +70,21 @@ void run_benchmark(const ProcessingMode mode, NeonVector& cleanData, const std::
             workingDataPtr = &tempData;
         }
         
-        const std::chrono::duration<double> execution_time = run_processor<KERNEL_RADIUS, CHUNK_SIZE>(mode, *workingDataPtr, convolutionKernel);
+        std::cout << "Run " << (i + 1) << ": running..." << std::flush;
         
-        double time_sec = execution_time.count();
-        std::cout << "Run " << (i + 1) << " took " << time_sec << " seconds\n";
-        execution_times[i] = time_sec;
+        ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE>(mode, *workingDataPtr, convolutionKernel);
+        
+        std::cout << "\rRun " << (i + 1) << ": ";
+        if (stats.overheadTimeSec < 1e-9) {
+            std::cout << stats.totalTimeSec << "s" << std::endl;
+        } else {
+            std::cout << stats.totalTimeSec << "s (Compute=" << stats.computeTimeSec << "s)" << std::endl;
+        }
+        
+        stats_collection[i] = stats;
     }
     
-    calc_benchmarks<KERNEL_RADIUS>(execution_times, dataSize);
+    calc_benchmarks<KERNEL_RADIUS>(stats_collection, dataSize);
     
     if (save_results) {
         std::string outputFilename = outputFolderPath + std::string(magic_enum::enum_name(mode)) + ".edf";

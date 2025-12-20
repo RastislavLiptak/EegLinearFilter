@@ -70,28 +70,10 @@ struct MetalContext {
     }
 };
 
-void init_gpu() {
-    static bool is_gpu_initialized = false;
-    if (is_gpu_initialized) return;
-    
-    try {
-        const auto start = std::chrono::high_resolution_clock::now();
-
-        MetalContext& ctx = MetalContext::get();
-        
-        const auto end = std::chrono::high_resolution_clock::now();
-        const std::chrono::duration<double> elapsed = end - start;
-        std::cout << "GPU initialization took " << elapsed.count() << " seconds" << std::endl;
-        
-    } catch (const std::exception& e) {
-        throw std::runtime_error("GPU initialization failed: " + std::string(e.what()));
-    }
-    
-    is_gpu_initialized = true;
-}
-
 template <int Radius>
-void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    auto start_wall = std::chrono::high_resolution_clock::now();
+
     constexpr size_t KSizeConst = 2 * Radius + 1;
     uint32_t KernelSize = (uint32_t)KSizeConst;
     uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
@@ -145,11 +127,22 @@ void convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::v
     commandBuffer->commit();
     commandBuffer->waitUntilCompleted();
     
+    auto end_wall = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(end_wall - start_wall).count();
+
+    double gpuStart = commandBuffer->GPUStartTime();
+    double gpuEnd = commandBuffer->GPUEndTime();
+    double computeTime = gpuEnd - gpuStart;
+
+    if (computeTime < 0) computeTime = 0;
+
     pool->release();
 
     dataBuffer->release();
     outBuffer->release();
     kernelBuffer->release();
+
+    return { totalTime, computeTime, totalTime - computeTime };
 }
 
 #endif // CONVOLVE_GPU_HPP

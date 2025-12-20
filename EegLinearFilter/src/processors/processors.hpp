@@ -15,15 +15,15 @@
 #include <chrono>
 
 template <int Radius, int ChunkSize>
-std::chrono::duration<double> run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
+ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
     
     NeonVector outputBuffer(allData.size(), 0.0f);
-    if (mode == ProcessingMode::GPU) {
-        init_gpu();
-    }
     
     const auto start = std::chrono::high_resolution_clock::now();
     
+    ProcessingStats gpuStats = {0.0, 0.0, 0.0};
+    bool isGpu = false;
+
     switch (mode) {
         case ProcessingMode::CPU_SEQ_APPLE:
             convolve_seq_apple<Radius>(allData, outputBuffer, convolutionKernel);
@@ -53,7 +53,8 @@ std::chrono::duration<double> run_processor(const ProcessingMode mode, NeonVecto
             convolve_par_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::GPU:
-            convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel);
+            gpuStats = convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel);
+            isGpu = true;
             break;
         default:
             throw std::runtime_error("Unknown processing mode");
@@ -66,7 +67,12 @@ std::chrono::duration<double> run_processor(const ProcessingMode mode, NeonVecto
     outputBuffer.clear();
     outputBuffer.shrink_to_fit();
     
-    return elapsed;
+    if (isGpu) {
+        return gpuStats;
+    } else {
+        double total = elapsed.count();
+        return { total, total, 0.0 };
+    }
 }
 
 #endif // PROCESSORS_HPP

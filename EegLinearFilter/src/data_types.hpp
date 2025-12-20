@@ -45,6 +45,12 @@ struct EdfHeaderInfo {
     int num_signals;
 };
 
+struct ProcessingStats {
+    double totalTimeSec;
+    double computeTimeSec;
+    double overheadTimeSec;
+};
+
 template <typename T, std::size_t Alignment>
 struct aligned_allocator {
     using value_type = T;
