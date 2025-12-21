@@ -20,7 +20,7 @@
 namespace fs = std::filesystem;
 
 template <int Radius>
-void log_benchmark_result(const std::string& mode, const std::string& filename, const int iteration, const int totalIterations, const ProcessingStats& stats) {
+void log_benchmark_result(const std::string& mode, const std::string& filename, const size_t outputElements, const int iteration, const int totalIterations, const ProcessingStats& stats) {
     
     if (!fs::exists(LOGS_DIR)) {
         fs::create_directory(LOGS_DIR);
@@ -32,7 +32,7 @@ void log_benchmark_result(const std::string& mode, const std::string& filename, 
     std::ofstream log_file(csv_path, std::ios::app);
 
     if (!file_exists) {
-        log_file << "Timestamp;Mode;Filename;KernelRadius;Iteration;TotalIterations;"
+        log_file << "Timestamp;Mode;Filename;OutputElements;KernelRadius;Iteration;TotalIterations;"
                 << "TotalTimeSec;ComputeTimeSec;OverheadTimeSec;CpuMemOpsSec;GpuMemOpsSec\n";
     }
 
@@ -42,6 +42,7 @@ void log_benchmark_result(const std::string& mode, const std::string& filename, 
         log_file << time_buffer << ";"
                 << mode << ";"
                 << filename << ";"
+                << outputElements << ";"
                 << Radius << ";"
                 << iteration << ";"
                 << totalIterations << ";"
@@ -127,6 +128,7 @@ void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, 
         log_benchmark_result<KERNEL_RADIUS>(
             std::string(magic_enum::enum_name(mode)),
             inputFilename,
+            dataSize - (2 * KERNEL_RADIUS),
             i + 1,
             benchmark_iteration_count,
             stats

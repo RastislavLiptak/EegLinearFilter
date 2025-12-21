@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 GENERATE_CSV = False
 GENERATE_PLOTS = True 
 DATA_FOLDER = "EegLinearFilter/out"
-OUTPUT_FOLDER = "checkup/result_comparison"
+OUTPUT_FOLDER = "python/results_similarity_by_mode"
 CHUNK_SIZE_BYTES = 100 * 1024 * 1024 
 
 def get_header_size(num_channels):
