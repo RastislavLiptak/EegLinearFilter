@@ -79,10 +79,10 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     double avg_cpu_mem = sum_cpu_mem / stats.size();
     double avg_gpu_mem = sum_gpu_mem / stats.size();
 
-    double megaSamplesPerSec = (outputElements / avg_total_time) / 1e6;
-    double calc_time_for_gflops = (avg_compute_time > 1e-9) ? avg_compute_time : avg_total_time;
+    double calc_time = (avg_compute_time > 1e-9) ? avg_compute_time : avg_total_time;
+    double megaSamplesPerSec = (outputElements / calc_time) / 1e6;
     double totalOperations = (double)outputElements * (double)KernelSize * 2.0;
-    double gigaFlops = (totalOperations / calc_time_for_gflops) / 1e9;
+    double gigaFlops = (totalOperations / calc_time) / 1e9;
 
     std::cout << "----------------------------------------\n";
     std::cout << "AVG results over " << stats.size() << " runs:" << std::endl;
@@ -99,7 +99,7 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     
     std::cout << "Metrics:" << std::endl;
     std::cout << "  Throughput: " << megaSamplesPerSec << " MSamples/s" << std::endl;
-    std::cout << "  Performance:" << gigaFlops << " GFLOPS" << std::endl;
+    std::cout << "  Performance: " << gigaFlops << " GFLOPS" << std::endl;
     std::cout << "========================================\n";
 }
 
@@ -134,9 +134,9 @@ void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, 
         
         std::cout << "\rRun " << (i + 1) << ": ";
         if (stats.overheadTimeSec < 1e-9) {
-            std::cout << stats.totalTimeSec << "s" << std::endl;
+            std::cout << stats.totalTimeSec << "s\033[K" << std::endl;
         } else {
-            std::cout << stats.totalTimeSec << "s (Compute=" << stats.computeTimeSec << "s)" << std::endl;
+            std::cout << stats.totalTimeSec << "s (Compute=" << stats.computeTimeSec << "s)\033[K" << std::endl;
         }
         
         stats_collection[i] = stats;
