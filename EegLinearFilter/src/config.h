@@ -44,6 +44,7 @@ enum class ProcessingMode {
 
 // --- CPU parameters ---
 #define CHUNK_SIZE 8192 // NOTE: must be a multiple of 16 for optimal NEON alignment.
+#define PREFETCH_LOOKAHEAD 64
 
 // --- GPU parameters ---
 #define THREADS_PER_GROUP 256 // NOTE: must be a multiple of 32 (Apple GPU SIMD width).
@@ -67,6 +68,7 @@ static_assert(KERNEL_SIGMA > 0.0f, "KERNEL_SIGMA must be positive for a valid ke
 
 // --- CPU parameters ---
 static_assert(CHUNK_SIZE > 0, "CHUNK_SIZE must be greater than 0.");
+static_assert(PREFETCH_LOOKAHEAD > 0, "PREFETCH_LOOKAHEAD must be greater than 0.");
 
 // --- GPU parameters ---
 static_assert(THREADS_PER_GROUP > 0, "THREADS_PER_GROUP must be greater than 0.");

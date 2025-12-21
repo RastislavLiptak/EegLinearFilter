@@ -181,6 +181,9 @@ void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, c
             size_t i = 0;
             
             for (; i + 16 <= actualChunkSize; i += 16) {
+                
+                __builtin_prefetch(d_chunk + i + k + PREFETCH_LOOKAHEAD, 0, 1);
+                
                 float32x4_t acc0 = vld1q_f32(o_chunk + i);
                 float32x4_t acc1 = vld1q_f32(o_chunk + i + 4);
                 float32x4_t acc2 = vld1q_f32(o_chunk + i + 8);
