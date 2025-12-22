@@ -1,5 +1,5 @@
 EegLinearFilter/data/*
 EegLinearFilter/out/*
-python/results_similarity_by_mode/*
+python/results_similarity/*
 python/benchmark_results/*
 EegLinearFilter/logs/*
