@@ -18,6 +18,7 @@ FOLDER_PLOTS = os.path.join(OUTPUT_ROOT, "plots")
 CHUNK_SIZE_BYTES = 50 * 1024 * 1024 
 MAX_PLOT_POINTS = 50000
 VIZ_FIXED_MAX_DIFF = 1000
+ERROR_THRESHOLD = 0
 
 def get_header_size(num_channels):
     return 256 + (num_channels * 256)
@@ -59,10 +60,10 @@ def plot_error_distribution(error_data, total_errors, name_a, name_b, save_path)
     sc = plt.scatter(samples, channels, c=diffs, cmap=cmap, norm=norm, s=10, marker='|', alpha=0.8, rasterized=True)
     
     cbar = plt.colorbar(sc)
-    cbar.set_label('Max Absolute Difference (Log Scale)', rotation=270, labelpad=20)
+    cbar.set_label('Max Absolute Difference (Log Scale, Fixed)', rotation=270, labelpad=20)
 
     title_text = (f"Error Distribution: {name_a} vs {name_b}\n"
-                  f"Visualizing worst errors per time-segment (Downsampled from {total_errors} total)")
+                  f"Visualizing worst errors per time-segment (Threshold > {ERROR_THRESHOLD}, Total Count: {total_errors})")
     
     plt.title(title_text, fontsize=12)
     plt.xlabel("Sample Index (Time)", fontsize=10)
@@ -113,16 +114,16 @@ def compare_raw_binary_streaming(file_a, file_b, n_channels, writer=None):
         diff = np.abs(chunk_a - chunk_b)
         
         local_max = np.max(diff)
-        if local_max == 0:
+        if local_max <= ERROR_THRESHOLD:
             continue
             
         max_raw_diff = max(max_raw_diff, local_max)
-        count_diff = np.count_nonzero(diff)
+        
+        error_indices_local = np.where(diff > ERROR_THRESHOLD)[0]
+        count_diff = len(error_indices_local)
         total_mismatches += count_diff
         
         if count_diff > 0:
-            error_indices_local = np.where(diff > 0)[0]
-            
             global_indices = i + error_indices_local
             record_indices = global_indices // record_len
             offsets_in_record = global_indices % record_len
@@ -195,6 +196,7 @@ def compare_files():
         return
     
     print(f"Found {n_files} EDF files.")
+    print(f"Error Threshold: {ERROR_THRESHOLD} (Errors <= {ERROR_THRESHOLD} are ignored)")
     print("-" * 115)
     print(f"{'FILE A':<25} | {'FILE B':<25} | {'MATCH %':<10} | {'DIFF COUNT':<12} | {'RAW MAX DIFF':<12}")
     print("-" * 115)
