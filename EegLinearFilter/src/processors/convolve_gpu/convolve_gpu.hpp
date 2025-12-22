@@ -21,11 +21,14 @@
 #include <iostream>
 #include <stdexcept>
 #include <chrono>
+#include <string>
 
 struct MetalContext {
     MTL::Device* device = nullptr;
     MTL::CommandQueue* commandQueue = nullptr;
-    MTL::ComputePipelineState* pipelineState = nullptr;
+    
+    MTL::ComputePipelineState* pipelineState32 = nullptr;
+    MTL::ComputePipelineState* pipelineState16 = nullptr;
 
     MetalContext() {
         device = MTL::CreateSystemDefaultDevice();
@@ -34,32 +37,40 @@ struct MetalContext {
         }
         commandQueue = device->newCommandQueue();
         
-        NS::Error* error = nullptr;
         MTL::Library* library = device->newDefaultLibrary();
         if (!library) {
             throw std::runtime_error("Error: Default library not found!");
         }
         
-        NS::String* functionName = NS::String::string("convolve_kernel", NS::UTF8StringEncoding);
+        pipelineState32 = createPipeline(library, "convolve_kernel_32");
+        pipelineState16 = createPipeline(library, "convolve_kernel_16");
+        
+        library->release();
+    }
+    
+    MTL::ComputePipelineState* createPipeline(MTL::Library* library, const char* functionNameStr) {
+        NS::Error* error = nullptr;
+        NS::String* functionName = NS::String::string(functionNameStr, NS::UTF8StringEncoding);
         MTL::Function* convolutionFunction = library->newFunction(functionName);
         
         if (!convolutionFunction) {
-            throw std::runtime_error("Error: Function 'convolve_kernel' not found in .metallib!");
+            throw std::runtime_error("Error: Function '" + std::string(functionNameStr) + "' not found in .metallib!");
         }
         
-        pipelineState = device->newComputePipelineState(convolutionFunction, &error);
+        MTL::ComputePipelineState* pso = device->newComputePipelineState(convolutionFunction, &error);
         
-        if (!pipelineState) {
-            throw std::runtime_error("Pipeline creation failed");
+        if (!pso) {
+            throw std::runtime_error("Pipeline creation failed for " + std::string(functionNameStr));
         }
 
         functionName->release();
         convolutionFunction->release();
-        library->release();
+        return pso;
     }
     
     ~MetalContext() {
-        if (pipelineState) pipelineState->release();
+        if (pipelineState32) pipelineState32->release();
+        if (pipelineState16) pipelineState16->release();
         if (commandQueue) commandQueue->release();
         if (device) device->release();
     }
@@ -71,7 +82,7 @@ struct MetalContext {
 };
 
 template <int Radius>
-ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, bool useHalfPrecision = false) {
     auto start_wall = std::chrono::high_resolution_clock::now();
 
     constexpr size_t KSizeConst = 2 * Radius + 1;
@@ -80,6 +91,12 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     uint32_t rawDataSize = (uint32_t)data.size();
     
     MetalContext& ctx = MetalContext::get();
+    
+    MTL::ComputePipelineState* currentPipeline = useHalfPrecision ? ctx.pipelineState16 : ctx.pipelineState32;
+    
+    if (!currentPipeline) {
+         throw std::runtime_error("Requested pipeline state is null!");
+    }
 
     auto mem_start = std::chrono::high_resolution_clock::now();
     
@@ -110,7 +127,8 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
 
     MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
     MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
-    computeEncoder->setComputePipelineState(ctx.pipelineState);
+    
+    computeEncoder->setComputePipelineState(currentPipeline);
     
     computeEncoder->setBuffer(dataBuffer, 0, 0);
     computeEncoder->setBuffer(outBuffer, 0, 1);
@@ -119,7 +137,8 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     computeEncoder->setBytes(&outSize, sizeof(uint32_t), 4);
     computeEncoder->setBytes(&rawDataSize, sizeof(uint32_t), 5);
     
-    NS::UInteger threadgroupMemSize = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * sizeof(float);
+    size_t elementSize = useHalfPrecision ? sizeof(uint16_t) : sizeof(float);
+    NS::UInteger threadgroupMemSize = (TILE_SIZE + KERNEL_SEGMENT_SIZE) * elementSize;
     computeEncoder->setThreadgroupMemoryLength(threadgroupMemSize, 0);
 
     NS::UInteger numGroups = (outSize + TILE_SIZE - 1) / TILE_SIZE;

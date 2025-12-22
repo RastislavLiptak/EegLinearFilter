@@ -1,5 +1,5 @@
 //
-//  kernel.metal
+//  kernel_32bit.metal
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 26.11.2025.
@@ -10,7 +10,7 @@
 
 using namespace metal;
 
-kernel void convolve_kernel(
+kernel void convolve_kernel_32(
     device const float4* data [[buffer(0)]],
     device float4* output [[buffer(1)]],
     constant float* convKernel [[buffer(2)]],
