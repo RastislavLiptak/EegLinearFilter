@@ -8,7 +8,7 @@ import pyedflib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
-EXPORT_DETAILED_CSV = False
+EXPORT_DETAILED_CSV = True
 VISUALIZE_ERRORS = True
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_ROOT = "python/results_similarity"
@@ -55,15 +55,27 @@ def plot_error_distribution(error_data, total_errors, name_a, name_b, save_path)
     plt.figure(figsize=(14, 8))
     
     cmap = plt.cm.jet
-    norm = colors.LogNorm(vmin=1, vmax=VIZ_FIXED_MAX_DIFF, clip=True)
+    vmin_val = max(1, ERROR_THRESHOLD)
+    norm = colors.LogNorm(vmin=vmin_val, vmax=max(vmin_val * 10, VIZ_FIXED_MAX_DIFF), clip=True)
 
     sc = plt.scatter(samples, channels, c=diffs, cmap=cmap, norm=norm, s=10, marker='|', alpha=0.8, rasterized=True)
     
     cbar = plt.colorbar(sc)
     cbar.set_label('Max Absolute Difference (Log Scale, Fixed)', rotation=270, labelpad=20)
 
-    title_text = (f"Error Distribution: {name_a} vs {name_b}\n"
-                  f"Visualizing worst errors per time-segment (Threshold > {ERROR_THRESHOLD}, Total Count: {total_errors})")
+    displayed_count = len(channels)
+    
+    info_parts = []
+    if ERROR_THRESHOLD > 0:
+        info_parts.append(f"Threshold > {ERROR_THRESHOLD}")
+        
+    if displayed_count >= total_errors:
+        info_parts.append(f"Displayed: {displayed_count} (All)")
+    else:
+        info_parts.append(f"Displayed: {displayed_count} (Subsampled) | Total: {total_errors}")
+
+    subtitle = " | ".join(info_parts)
+    title_text = f"{name_a} vs {name_b}\n{subtitle}"
     
     plt.title(title_text, fontsize=12)
     plt.xlabel("Sample Index (Time)", fontsize=10)
@@ -196,7 +208,9 @@ def compare_files():
         return
     
     print(f"Found {n_files} EDF files.")
-    print(f"Error Threshold: {ERROR_THRESHOLD} (Errors <= {ERROR_THRESHOLD} are ignored)")
+    if ERROR_THRESHOLD > 0:
+        print(f"Error Threshold: {ERROR_THRESHOLD}")
+        
     print("-" * 115)
     print(f"{'FILE A':<25} | {'FILE B':<25} | {'MATCH %':<10} | {'DIFF COUNT':<12} | {'RAW MAX DIFF':<12}")
     print("-" * 115)
