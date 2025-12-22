@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <fstream>
 #include <cctype>
+#include <iomanip>
+#include <cmath>
 #include "../../lib/magic_enum/magic_enum.hpp"
 
 namespace fs = std::filesystem;
@@ -254,9 +256,12 @@ StepResult get_input_file_path(AppConfig& config) {
 
 StepResult set_processing_mode(AppConfig& config) {
     std::cout << "Select benchmark mode:" << std::endl;
-    std::cout << "-1 - WHOLE_BENCHMARK_SUITE (Default)" << std::endl;
+    const int max_val = (int)ProcessingMode::COUNT - 1;
+    const int width = (max_val > 0) ? (int)log10(max_val) + 1 : 1;
+    std::cout << std::setw(width) << -1 << " - WHOLE_BENCHMARK_SUITE (Default)" << std::endl;
+
     for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
-        std::cout << " " << i << " - " << magic_enum::enum_name(static_cast<ProcessingMode>(i)) << std::endl;
+        std::cout << std::setw(width) << i << " - " << magic_enum::enum_name(static_cast<ProcessingMode>(i)) << std::endl;
     }
 
     std::string input_buffer;
