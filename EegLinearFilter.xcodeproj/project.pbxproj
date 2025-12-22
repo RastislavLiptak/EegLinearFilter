@@ -12,6 +12,8 @@
 		D69F13F12ED72E06009C3FF8 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F13F02ED72E06009C3FF8 /* Metal.framework */; };
 		D69F13F32ED72E15009C3FF8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F13F22ED72E15009C3FF8 /* Foundation.framework */; };
 		D69F14862ED73141009C3FF8 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D69F14852ED73141009C3FF8 /* QuartzCore.framework */; };
+		D6E5BD322EF9A9410046BB06 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6E5BD312EF9A9410046BB06 /* IOKit.framework */; };
+		D6E5BD342EF9A9620046BB06 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6E5BD332EF9A9620046BB06 /* CoreFoundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -35,6 +37,8 @@
 		D69F13F02ED72E06009C3FF8 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		D69F13F22ED72E15009C3FF8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		D69F14852ED73141009C3FF8 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		D6E5BD312EF9A9410046BB06 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		D6E5BD332EF9A9620046BB06 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		D6E741EA2EDA467300217976 /* MetalPerformanceShaders.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalPerformanceShaders.framework; path = System/Library/Frameworks/MetalPerformanceShaders.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -54,8 +58,10 @@
 				D67306C42EDF0A7300E3EF97 /* libcurl.tbd in Frameworks */,
 				D69F14862ED73141009C3FF8 /* QuartzCore.framework in Frameworks */,
 				D69F13F12ED72E06009C3FF8 /* Metal.framework in Frameworks */,
+				D6E5BD342EF9A9620046BB06 /* CoreFoundation.framework in Frameworks */,
 				D69F13F32ED72E15009C3FF8 /* Foundation.framework in Frameworks */,
 				D69F13BA2ED5E91E009C3FF8 /* Accelerate.framework in Frameworks */,
+				D6E5BD322EF9A9410046BB06 /* IOKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,6 +89,8 @@
 		D630F60B2ECC5F4A001761CF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D6E5BD332EF9A9620046BB06 /* CoreFoundation.framework */,
+				D6E5BD312EF9A9410046BB06 /* IOKit.framework */,
 				D67306C32EDF0A6C00E3EF97 /* libcurl.tbd */,
 				D6E741EA2EDA467300217976 /* MetalPerformanceShaders.framework */,
 				D69F14852ED73141009C3FF8 /* QuartzCore.framework */,

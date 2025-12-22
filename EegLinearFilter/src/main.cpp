@@ -5,6 +5,7 @@
 //  Created by Rastislav Lipták on 18.11.2025.
 //
 
+#include <IOKit/pwr_mgt/IOPMLib.h>
 #include <iostream>
 #include <vector>
 
@@ -24,6 +25,9 @@ void print_welcome_banner() {
 }
 
 int main(int argc, const char * argv[]) {
+    IOPMAssertionID assertionID;
+    CFStringRef reasonForActivity = CFSTR("EegLinearFilter Benchmark Running");
+    IOReturn success = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep, kIOPMAssertionLevelOn, reasonForActivity, &assertionID);
     print_welcome_banner();
     
     bool keepRunning = true;
@@ -52,10 +56,15 @@ int main(int argc, const char * argv[]) {
             
         } catch (const std::exception& e) {
             std::cerr << "\nCRITICAL ERROR: Data processing failed.\nDetails: " << e.what() << std::endl;
+            if (success == kIOReturnSuccess) IOPMAssertionRelease(assertionID);
             return EXIT_FAILURE;
         }
         
     } while (keepRunning);
+    
+    if (success == kIOReturnSuccess) {
+        IOPMAssertionRelease(assertionID);
+    }
     
     std::cout << "Exiting application. Goodbye!" << std::endl;
     return EXIT_SUCCESS;
