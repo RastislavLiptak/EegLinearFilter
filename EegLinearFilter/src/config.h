@@ -22,8 +22,9 @@ enum class ProcessingMode {
     CPU_PAR_NO_VEC,          // Parallel, no vectorization
     CPU_PAR_AUTO_VEC,        // Parallel, auto-vectorization
     CPU_PAR_MANUAL_VEC,      // Parallel, manual vectorization
-    GPU_32bit,               // GPU-accelerated (32-bit precision)
-    GPU_16bit,               // GPU-accelerated (16-bit precision)
+    GPU_NAIVE,               // GPU-accelerated naive approach
+    GPU_32BIT,               // GPU-accelerated (32-bit precision)
+    GPU_16BIT,               // GPU-accelerated (16-bit precision)
     
     COUNT
 };

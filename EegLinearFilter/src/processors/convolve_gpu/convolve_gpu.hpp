@@ -27,6 +27,7 @@ struct MetalContext {
     MTL::Device* device = nullptr;
     MTL::CommandQueue* commandQueue = nullptr;
     
+    MTL::ComputePipelineState* pipelineStateNaive = nullptr;
     MTL::ComputePipelineState* pipelineState32 = nullptr;
     MTL::ComputePipelineState* pipelineState16 = nullptr;
 
@@ -42,6 +43,7 @@ struct MetalContext {
             throw std::runtime_error("Error: Default library not found!");
         }
         
+        pipelineStateNaive = createPipeline(library, "convolve_kernel_naive");
         pipelineState32 = createPipeline(library, "convolve_kernel_32");
         pipelineState16 = createPipeline(library, "convolve_kernel_16");
         
@@ -69,6 +71,7 @@ struct MetalContext {
     }
     
     ~MetalContext() {
+        if (pipelineStateNaive) pipelineStateNaive->release();
         if (pipelineState32) pipelineState32->release();
         if (pipelineState16) pipelineState16->release();
         if (commandQueue) commandQueue->release();
@@ -80,6 +83,100 @@ struct MetalContext {
         return instance;
     }
 };
+
+template <int Radius>
+ProcessingStats convolve_gpu_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+    auto start_wall = std::chrono::high_resolution_clock::now();
+
+    constexpr size_t KSizeConst = 2 * Radius + 1;
+    uint32_t KernelSize = (uint32_t)KSizeConst;
+    uint32_t outSize = (uint32_t)(data.size() - KSizeConst + 1);
+    
+    MetalContext& ctx = MetalContext::get();
+    
+    if (!ctx.pipelineStateNaive) {
+         throw std::runtime_error("Naive pipeline state is null!");
+    }
+
+    auto mem_start = std::chrono::high_resolution_clock::now();
+    
+    MTL::Buffer* dataBuffer = ctx.device->newBuffer(
+        (void*)data.data(),
+        data.size() * sizeof(float),
+        MTL::ResourceStorageModeShared,
+        nullptr
+    );
+    
+    MTL::Buffer* outBuffer = ctx.device->newBuffer(
+        (void*)outputBuffer.data(),
+        outputBuffer.size() * sizeof(float),
+        MTL::ResourceStorageModeShared,
+        nullptr
+    );
+    
+    MTL::Buffer* kernelBuffer = ctx.device->newBuffer(
+        convolutionKernel.data(),
+        convolutionKernel.size() * sizeof(float),
+        MTL::ResourceStorageModeShared
+    );
+    
+    auto mem_end = std::chrono::high_resolution_clock::now();
+    double memoryTime = std::chrono::duration<double>(mem_end - mem_start).count();
+    
+    MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
+    MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
+    
+    computeEncoder->setComputePipelineState(ctx.pipelineStateNaive);
+    
+    computeEncoder->setBuffer(dataBuffer, 0, 0);
+    computeEncoder->setBuffer(outBuffer, 0, 1);
+    computeEncoder->setBuffer(kernelBuffer, 0, 2);
+    computeEncoder->setBytes(&KernelSize, sizeof(uint32_t), 3);
+    computeEncoder->setBytes(&outSize, sizeof(uint32_t), 4);
+    
+    const int items_per_thread = 4;
+    NS::UInteger threadsPerGroup = THREADS_PER_GROUP;
+    
+    NS::UInteger tilePixels = threadsPerGroup * items_per_thread;
+
+    NS::UInteger threadgroupMemSize = (tilePixels + KSizeConst - 1) * sizeof(float);
+    computeEncoder->setThreadgroupMemoryLength(threadgroupMemSize, 0);
+
+    NS::UInteger numGroups = (outSize + tilePixels - 1) / tilePixels;
+    MTL::Size groupSize = MTL::Size::Make(threadsPerGroup, 1, 1);
+    MTL::Size gridSize = MTL::Size::Make(numGroups * threadsPerGroup, 1, 1);
+    
+    computeEncoder->dispatchThreads(gridSize, groupSize);
+    computeEncoder->endEncoding();
+    
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+    
+    double gpuStart = commandBuffer->GPUStartTime();
+    double gpuEnd = commandBuffer->GPUEndTime();
+    double computeTime = gpuEnd - gpuStart;
+    if (computeTime < 0) computeTime = 0;
+
+    mem_start = std::chrono::high_resolution_clock::now();
+    
+    dataBuffer->release();
+    outBuffer->release();
+    kernelBuffer->release();
+    
+    mem_end = std::chrono::high_resolution_clock::now();
+    memoryTime += std::chrono::duration<double>(mem_end - mem_start).count();
+    
+    auto end_wall = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(end_wall - start_wall).count();
+
+    return {
+        totalTime,
+        computeTime,
+        totalTime - computeTime - memoryTime,
+        0.0,
+        memoryTime
+    };
+}
 
 template <int Radius>
 ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, bool useHalfPrecision = false) {

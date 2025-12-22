@@ -55,11 +55,15 @@ ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, co
         case ProcessingMode::CPU_PAR_MANUAL_VEC:
             convolve_par_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
-        case ProcessingMode::GPU_16bit:
+        case ProcessingMode::GPU_NAIVE:
+            gpuStats = convolve_gpu_naive<Radius>(allData, outputBuffer, convolutionKernel);
+            isGpu = true;
+            break;
+        case ProcessingMode::GPU_16BIT:
             gpuStats = convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel, true);
             isGpu = true;
             break;
-        case ProcessingMode::GPU_32bit:
+        case ProcessingMode::GPU_32BIT:
             gpuStats = convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel, false);
             isGpu = true;
             break;
