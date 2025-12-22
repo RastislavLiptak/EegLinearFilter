@@ -83,10 +83,8 @@ def load_data(filepath):
 def calculate_median_trajectory(runs):
     if not runs:
         return []
-    
     max_len = max(len(r) for r in runs)
     robust_values = []
-
     for i in range(max_len):
         vals_at_i = [r[i] for r in runs if i < len(r)]
         robust_values.append(statistics.median(vals_at_i) if vals_at_i else 0)
@@ -111,16 +109,24 @@ def get_active_metrics(modes_data, metric_list):
             active.append(metric)
     return active
 
-# --- GFLOPS CALCULATION ---
+# --- CALCULATION ---
 
 def calculate_gflops(median_compute_time, output_elements, radius):
     if median_compute_time <= 1e-9 or output_elements == 0:
         return 0.0
-        
     kernel_size = 2 * radius + 1
     total_operations = output_elements * kernel_size * 2.0
     gflops = (total_operations / median_compute_time) / 1e9
     return gflops
+
+def format_large_number(num):
+    if num >= 1e9:
+        return f"{num / 1e9:.1f}G"
+    elif num >= 1e6:
+        return f"{num / 1e6:.1f}M"
+    elif num >= 1e3:
+        return f"{num / 1e3:.1f}k"
+    return str(num)
 
 # --- PLOTTING FUNCTIONS ---
 
@@ -131,8 +137,7 @@ def plot_single_mode_detail(filename, radius, mode, metric_data, output_dir):
         if sum(val for run in runs for val in run) > 0:
             active_metrics.append(metric)
             
-    if not active_metrics:
-        return
+    if not active_metrics: return
 
     num_metrics = len(active_metrics)
     cols = 2
@@ -155,7 +160,6 @@ def plot_single_mode_detail(filename, radius, mode, metric_data, output_dir):
                 l, = ax.plot(run_values, marker='.', linestyle='-', 
                         linewidth=1.5, markersize=3, alpha=0.25, 
                         label=f"Run {run_idx + 1}")
-                
                 if i == 0 and len(runs) <= 5 and f"Run {run_idx + 1}" not in detail_labels:
                     detail_handles.append(l)
                     detail_labels.append(f"Run {run_idx + 1}")
@@ -192,11 +196,9 @@ def plot_single_mode_detail(filename, radius, mode, metric_data, output_dir):
 
 def plot_combined_summary(filename, radius, modes_data, output_dir):
     active_metrics = get_active_metrics(modes_data, COMPARISON_METRICS)
-    if not active_metrics:
-        return
+    if not active_metrics: return
 
     num_metrics = len(active_metrics)
-
     fig, axes = plt.subplots(2, num_metrics, figsize=(7 * num_metrics, 12))
     fig.suptitle(f"Combined Benchmark Summary: {filename} (R={radius})", fontsize=20, fontweight='bold', y=0.98)
     
@@ -217,7 +219,6 @@ def plot_combined_summary(filename, radius, modes_data, output_dir):
             if not runs: continue
             
             median_values = calculate_median_trajectory(runs)
-
             if sum(median_values) > 0:
                 line, = ax.plot(median_values, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
                 if i == 0:
@@ -235,9 +236,7 @@ def plot_combined_summary(filename, radius, modes_data, output_dir):
         for mode, data in modes_data.items():
             runs = data['metrics'][metric]
             if not runs: continue
-
             median_values = calculate_median_trajectory(runs)
-            
             if sum(median_values) > 0:
                 color, group_name = get_arch_style(mode)
                 used_groups.add(group_name)
@@ -253,8 +252,7 @@ def plot_combined_summary(filename, radius, modes_data, output_dir):
     if lines_handles_detailed:
         num_cols = min(len(lines_labels_detailed), 4)
         fig.legend(lines_handles_detailed, lines_labels_detailed, 
-                   loc='lower center', 
-                   bbox_to_anchor=(0.5, 0.86), 
+                   loc='lower center', bbox_to_anchor=(0.5, 0.86), 
                    ncol=num_cols, frameon=False, fontsize='medium')
 
     custom_lines = []
@@ -267,11 +265,226 @@ def plot_combined_summary(filename, radius, modes_data, output_dir):
             
     if custom_lines:
         fig.legend(custom_lines, custom_labels, 
-                   loc='lower center', 
-                   bbox_to_anchor=(0.5, 0.405),
+                   loc='lower center', bbox_to_anchor=(0.5, 0.405),
                    ncol=len(custom_labels), frameon=False, fontsize='medium')
 
     plt.savefig(os.path.join(output_dir, "combined_summary.pdf"), dpi=150)
+    plt.close(fig)
+
+def create_radius_scaling_time_pdf(filename, radiuses_data, output_dir):
+    scaling_data = defaultdict(lambda: defaultdict(list))
+    unique_radiuses = sorted(radiuses_data.keys())
+    
+    for radius in unique_radiuses:
+        modes = radiuses_data[radius]
+        for mode, data in modes.items():
+            for metric in COMPARISON_METRICS:
+                runs = data['metrics'][metric]
+                all_vals = [val for run in runs for val in run]
+                if all_vals:
+                    med_val = statistics.median(all_vals)
+                    scaling_data[metric][mode].append((radius, med_val))
+
+    if not scaling_data:
+        return
+
+    num_metrics = len(COMPARISON_METRICS)
+    fig, axes = plt.subplots(2, num_metrics, figsize=(7 * num_metrics, 12))
+    fig.suptitle(f"Radius Scaling Analysis: {filename}", fontsize=20, fontweight='bold', y=0.98)
+    
+    if num_metrics == 1:
+        axes_detailed = [axes[0]]
+        axes_grouped = [axes[1]]
+    else:
+        axes_detailed = axes[0]
+        axes_grouped = axes[1]
+
+    lines_handles_detailed = []
+    lines_labels_detailed = []
+    
+    for i, metric in enumerate(COMPARISON_METRICS):
+        ax = axes_detailed[i]
+        
+        for mode, points in scaling_data[metric].items():
+            if not points: continue
+            
+            points.sort(key=lambda x: x[0])
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            
+            if ys:
+                line, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                if i == 0:
+                    lines_handles_detailed.append(line)
+                    lines_labels_detailed.append(mode)
+        
+        ax.set_title(f"Detailed: {metric}", fontweight='bold')
+        ax.set_xlabel('Kernel Radius')
+        ax.set_ylabel('Time (s) [Median]')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        if len(unique_radiuses) < 20:
+            ax.set_xticks(unique_radiuses)
+
+    used_groups = set()
+    
+    for i, metric in enumerate(COMPARISON_METRICS):
+        ax = axes_grouped[i]
+        
+        for mode, points in scaling_data[metric].items():
+            if not points: continue
+            
+            points.sort(key=lambda x: x[0])
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            
+            if ys:
+                color, group_name = get_arch_style(mode)
+                used_groups.add(group_name)
+                ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, color=color, alpha=0.7)
+        
+        ax.set_title(f"Grouped: {metric}", fontweight='bold')
+        ax.set_xlabel('Kernel Radius')
+        ax.set_ylabel('Time (s) [Median]')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        if len(unique_radiuses) < 20:
+            ax.set_xticks(unique_radiuses)
+
+    plt.tight_layout(rect=[0, 0.02, 1, 0.88])
+    plt.subplots_adjust(hspace=0.50) 
+
+    if lines_handles_detailed:
+        num_cols = min(len(lines_labels_detailed), 4)
+        fig.legend(lines_handles_detailed, lines_labels_detailed, 
+                   loc='lower center', bbox_to_anchor=(0.5, 0.86), 
+                   ncol=num_cols, frameon=False, fontsize='medium')
+
+    custom_lines = []
+    custom_labels = []
+    preferred_order = ['Sequential', 'Parallel', 'GPU', 'Other']
+    for group in preferred_order:
+        if group in used_groups:
+            custom_lines.append(Line2D([0], [0], color=ARCH_COLORS[group], lw=2))
+            custom_labels.append(group)
+            
+    if custom_lines:
+        fig.legend(custom_lines, custom_labels, 
+                   loc='lower center', bbox_to_anchor=(0.5, 0.405),
+                   ncol=len(custom_labels), frameon=False, fontsize='medium')
+
+    output_path = os.path.join(output_dir, "scaling_analysis_time.pdf")
+    plt.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+def create_radius_scaling_gflops_pdf(filename, radiuses_data, output_dir):
+    scaling_data = defaultdict(lambda: defaultdict(list))
+    unique_radiuses = sorted(radiuses_data.keys())
+    
+    target_metrics = ["ComputeTimeSec"]
+    
+    for radius in unique_radiuses:
+        modes = radiuses_data[radius]
+        for mode, data in modes.items():
+            output_elements = data['meta'].get('OutputElements', 0)
+            
+            for metric in target_metrics:
+                runs = data['metrics'][metric]
+                all_vals = [val for run in runs for val in run]
+                
+                if all_vals:
+                    med_time = statistics.median(all_vals)
+                    gflops_val = calculate_gflops(med_time, output_elements, radius)
+                    scaling_data[metric][mode].append((radius, gflops_val))
+
+    if not scaling_data:
+        return
+
+    num_metrics = len(target_metrics)
+    
+    fig, axes = plt.subplots(2, num_metrics, figsize=(12, 14)) 
+    
+    fig.suptitle(f"GFLOPS Scaling Analysis: {filename}", fontsize=20, fontweight='bold', y=0.98)
+    
+    if num_metrics == 1:
+        axes_detailed = [axes[0]]
+        axes_grouped = [axes[1]]
+    else:
+        axes_detailed = axes[0]
+        axes_grouped = axes[1]
+
+    lines_handles_detailed = []
+    lines_labels_detailed = []
+    
+    for i, metric in enumerate(target_metrics):
+        ax = axes_detailed[i]
+        
+        for mode, points in scaling_data[metric].items():
+            if not points: continue
+            
+            points.sort(key=lambda x: x[0])
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            
+            if ys:
+                line, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                if i == 0:
+                    lines_handles_detailed.append(line)
+                    lines_labels_detailed.append(mode)
+        
+        ax.set_title(f"Detailed: {metric}", fontweight='bold')
+        ax.set_xlabel('Kernel Radius')
+        ax.set_ylabel('Performance (GFLOPS)')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        if len(unique_radiuses) < 20:
+            ax.set_xticks(unique_radiuses)
+
+    used_groups = set()
+    
+    for i, metric in enumerate(target_metrics):
+        ax = axes_grouped[i]
+        
+        for mode, points in scaling_data[metric].items():
+            if not points: continue
+            
+            points.sort(key=lambda x: x[0])
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            
+            if ys:
+                color, group_name = get_arch_style(mode)
+                used_groups.add(group_name)
+                ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, color=color, alpha=0.7)
+        
+        ax.set_title(f"Grouped: {metric}", fontweight='bold')
+        ax.set_xlabel('Kernel Radius')
+        ax.set_ylabel('Performance (GFLOPS)')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        if len(unique_radiuses) < 20:
+            ax.set_xticks(unique_radiuses)
+
+    plt.tight_layout(rect=[0, 0.02, 1, 0.88])
+    plt.subplots_adjust(hspace=0.40) 
+
+    if lines_handles_detailed:
+        num_cols = min(len(lines_labels_detailed), 4)
+        fig.legend(lines_handles_detailed, lines_labels_detailed, 
+                   loc='lower center', bbox_to_anchor=(0.5, 0.86), 
+                   ncol=num_cols, frameon=False, fontsize='medium')
+
+    custom_lines = []
+    custom_labels = []
+    preferred_order = ['Sequential', 'Parallel', 'GPU', 'Other']
+    for group in preferred_order:
+        if group in used_groups:
+            custom_lines.append(Line2D([0], [0], color=ARCH_COLORS[group], lw=2))
+            custom_labels.append(group)
+            
+    if custom_lines:
+        fig.legend(custom_lines, custom_labels, 
+                   loc='lower center', bbox_to_anchor=(0.5, 0.415),
+                   ncol=len(custom_labels), frameon=False, fontsize='medium')
+
+    output_path = os.path.join(output_dir, "scaling_analysis_gflops.pdf")
+    plt.savefig(output_path, dpi=150)
     plt.close(fig)
 
 # --- TABLE GENERATION ---
@@ -338,10 +551,8 @@ def create_summary_table_pdf(filename, radius, modes_data, output_dir):
     num_rows = len(table_rows) + 1
     calc_height = num_rows * 0.4 + 1.0
     
-    fig, ax = plt.subplots(figsize=(12, calc_height))
-    
+    fig, ax = plt.subplots(figsize=(14, calc_height))
     ax.axis('off')
-    
     ax.set_title(f"Performance Statistics: {filename} (R={radius})", fontsize=16, fontweight='bold')
     table = ax.table(cellText=cell_text, colLabels=columns, loc='center', cellLoc='center', bbox=[0, 0, 1, 1])
     
@@ -357,6 +568,92 @@ def create_summary_table_pdf(filename, radius, modes_data, output_dir):
                 cell.set_facecolor('#f2f2f2')
     
     plt.savefig(os.path.join(output_dir, "performance_table.pdf"), dpi=150, bbox_inches='tight', pad_inches=0.1)
+    plt.close(fig)
+
+def create_radius_analysis_table_pdf(filename, radiuses_data, output_dir):
+    unique_radiuses = sorted(radiuses_data.keys())
+    unique_modes = set()
+    
+    data_map = defaultdict(dict)
+    radius_meta = {} 
+
+    for radius in unique_radiuses:
+        modes = radiuses_data[radius]
+        for mode, data in modes.items():
+            unique_modes.add(mode)
+            
+            if radius not in radius_meta:
+                 output_elems = data['meta'].get('OutputElements', 0)
+                 radius_meta[radius] = output_elems
+            
+            runs = data['metrics']['ComputeTimeSec']
+            all_vals = [val for run in runs for val in run]
+            med_time = statistics.median(all_vals) if all_vals else 0.0
+            
+            output_elements = data['meta'].get('OutputElements', 0)
+            gflops = calculate_gflops(med_time, output_elements, radius)
+            
+            data_map[mode][radius] = (med_time, gflops)
+
+    mode_total_times = {}
+    for mode in unique_modes:
+        total_time = 0.0
+        for r in unique_radiuses:
+            if r in data_map[mode]:
+                total_time += data_map[mode][r][0]
+        mode_total_times[mode] = total_time
+
+    sorted_modes = sorted(list(unique_modes), key=lambda m: mode_total_times[m])
+
+    if not sorted_modes or not unique_radiuses:
+        return
+
+    col_labels = ["Mode"]
+    for r in unique_radiuses:
+        out_el = radius_meta.get(r, 0)
+        kernel_size = 2 * r + 1
+        total_ops = out_el * kernel_size * 2
+        ops_str = format_large_number(int(total_ops))
+        col_labels.append(f"R={r}\n({ops_str} Ops)")
+
+    cell_text = []
+    for mode in sorted_modes:
+        row_data = [mode]
+        for r in unique_radiuses:
+            if r in data_map[mode]:
+                time_val, gflops_val = data_map[mode][r]
+                cell_str = f"{time_val:.4f} s\n({gflops_val:.2f} GF)"
+            else:
+                cell_str = "N/A"
+            row_data.append(cell_str)
+        cell_text.append(row_data)
+
+    width = max(10, len(unique_radiuses) * 2.5 + 2)
+    height = len(sorted_modes) * 0.6 + 1.5
+    
+    fig, ax = plt.subplots(figsize=(width, height))
+    ax.axis('off')
+    ax.set_title(f"Scaling Analysis: {filename}", fontsize=16, fontweight='bold', y=0.98)
+    
+    table = ax.table(cellText=cell_text, colLabels=col_labels, loc='center', cellLoc='center', bbox=[0, 0, 1, 0.90])
+    
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+
+    for (i, j), cell in table.get_celld().items():
+        if i == 0:
+            cell.set_text_props(weight='bold', color='white')
+            cell.set_facecolor('#40466e')
+            cell.set_height(0.15)
+        else:
+            cell.set_height(0.1)
+            if i % 2 == 0:
+                cell.set_facecolor('#f2f2f2')
+            else:
+                cell.set_facecolor('#ffffff')
+
+    output_path = os.path.join(output_dir, "scaling_analysis_table.pdf")
+    plt.savefig(output_path, dpi=150, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
 # --- MATRIX GENERATION ---
@@ -401,7 +698,6 @@ def create_speedup_matrix_pdf(filename, radius, modes_data, output_dir):
     for i in range(n):
         for j in range(n):
             val = matrix_data[i][j]
-            
             text_color = "black"
             if val > 3 or val < 0.3:
                 text_color = "white"
@@ -425,8 +721,15 @@ def process_benchmarks(data, output_dir_base):
     for filename, radiuses in data.items():
         safe_filename = filename.replace('.', '_')
         
+        file_level_output_dir = os.path.join(output_dir_base, safe_filename)
+        os.makedirs(file_level_output_dir, exist_ok=True)
+
+        create_radius_scaling_time_pdf(filename, radiuses, file_level_output_dir)
+        create_radius_scaling_gflops_pdf(filename, radiuses, file_level_output_dir)
+        create_radius_analysis_table_pdf(filename, radiuses, file_level_output_dir)
+
         for radius, modes in radiuses.items():
-            specific_output_dir = os.path.join(output_dir_base, safe_filename, str(radius))
+            specific_output_dir = os.path.join(file_level_output_dir, str(radius))
             os.makedirs(specific_output_dir, exist_ok=True)
             
             for mode, config_data in modes.items():
