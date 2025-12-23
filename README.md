@@ -52,7 +52,7 @@ Run the application directly from Xcode (`Cmd + R`) or via the terminal executab
 1.  **Input File**: Provide the path to an `.edf` file. If the file is missing, the app can attempt to download a sample dataset.
 2.  **Select Mode**: Choose a specific algorithm index (0-11) or select `-1` to run the **Whole Benchmark Suite**.
 3.  **Iterations**: Set the number of test runs for statistical robustness (default: 10).
-4.  **Save Results**: Choose `y` to log metrics to a CSV file.
+4.  **Save Results**: Choose `y` to save filtered data to EDF file.
 5.  **Output Path**: Define where results and filtered data should be stored.
 
 ## 📊 Analyzing Results
