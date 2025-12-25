@@ -510,6 +510,124 @@ def create_radius_scaling_gflops_pdf(filename, radiuses_data, output_dir):
     plt.savefig(output_path, dpi=150)
     plt.close(fig)
 
+def create_radius_scaling_family_split(filename, radiuses_data, output_dir):
+    unique_radiuses = sorted(radiuses_data.keys())
+    if len(unique_radiuses) < 2: return
+
+    families = ['Sequential', 'Parallel', 'GPU']
+    
+    for family in families:
+        scaling_data_time = defaultdict(lambda: defaultdict(list))
+        has_data_time = False
+
+        for radius in unique_radiuses:
+            modes = radiuses_data[radius]
+            for mode, data in modes.items():
+                _, mode_family = get_arch_style(mode)
+                if mode_family != family:
+                    continue
+
+                for metric in COMPARISON_METRICS:
+                    runs = data['metrics'][metric]
+                    all_vals = [val for run in runs for val in run]
+                    if all_vals:
+                        med_val = statistics.median(all_vals)
+                        scaling_data_time[metric][mode].append((radius, med_val))
+                        has_data_time = True
+
+        if has_data_time:
+            num_metrics = len(COMPARISON_METRICS)
+            fig, axes = plt.subplots(1, num_metrics, figsize=(6 * num_metrics, 6))
+            fig.suptitle(f"Radius Scaling ({family}): {filename}", fontsize=16, fontweight='bold', y=0.98)
+            
+            axes_list = [axes] if num_metrics == 1 else axes
+
+            lines_handles = []
+            lines_labels = []
+
+            for i, metric in enumerate(COMPARISON_METRICS):
+                ax = axes_list[i]
+                for mode, points in scaling_data_time[metric].items():
+                    if not points: continue
+                    points.sort(key=lambda x: x[0])
+                    xs = [p[0] for p in points]
+                    ys = [p[1] for p in points]
+                    
+                    if ys:
+                        l, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                        if i == 0:
+                            lines_handles.append(l)
+                            lines_labels.append(mode)
+                
+                ax.set_title(metric, fontweight='bold')
+                ax.set_xlabel('Kernel Radius')
+                ax.set_ylabel('Time (s) [Median]')
+                ax.grid(True, linestyle='--', alpha=0.6)
+                if len(unique_radiuses) < 20:
+                    ax.set_xticks(unique_radiuses)
+
+            if lines_handles:
+                fig.legend(lines_handles, lines_labels, loc='lower center', 
+                           bbox_to_anchor=(0.5, 0.02), ncol=min(len(lines_labels), 3), frameon=False)
+
+            plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+            plt.savefig(os.path.join(output_dir, f"scaling_analysis_time_{family}.pdf"), dpi=150)
+            plt.close(fig)
+
+        scaling_data_gflops = defaultdict(list)
+        has_data_gflops = False
+        target_metric = "ComputeTimeSec"
+
+        for radius in unique_radiuses:
+            modes = radiuses_data[radius]
+            for mode, data in modes.items():
+                _, mode_family = get_arch_style(mode)
+                if mode_family != family:
+                    continue
+                
+                output_elements = data['meta'].get('OutputElements', 0)
+                runs = data['metrics'][target_metric]
+                all_vals = [val for run in runs for val in run]
+                
+                if all_vals:
+                    med_time = statistics.median(all_vals)
+                    gflops_val = calculate_gflops(med_time, output_elements, radius)
+                    scaling_data_gflops[mode].append((radius, gflops_val))
+                    has_data_gflops = True
+
+        if has_data_gflops:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            fig.suptitle(f"Radius GFLOPS ({family}): {filename}", fontsize=16, fontweight='bold', y=0.98)
+            
+            lines_handles = []
+            lines_labels = []
+
+            for mode, points in scaling_data_gflops.items():
+                if not points: continue
+                points.sort(key=lambda x: x[0])
+                xs = [p[0] for p in points]
+                ys = [p[1] for p in points]
+                
+                if ys:
+                    l, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                    lines_handles.append(l)
+                    lines_labels.append(mode)
+
+            ax.set_title("Compute Performance", fontweight='bold')
+            ax.set_xlabel('Kernel Radius')
+            ax.set_ylabel('Performance (GFLOPS)')
+            ax.grid(True, linestyle='--', alpha=0.6)
+            if len(unique_radiuses) < 20:
+                ax.set_xticks(unique_radiuses)
+
+            if lines_handles:
+                fig.legend(lines_handles, lines_labels, loc='lower center', 
+                           bbox_to_anchor=(0.5, 0.02), ncol=min(len(lines_labels), 3), frameon=False)
+
+            plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+            plt.savefig(os.path.join(output_dir, f"scaling_analysis_gflops_{family}.pdf"), dpi=150)
+            plt.close(fig)
+
 def create_data_scaling_time_pdf(radius, size_data, output_dir):
     unique_sizes = sorted(size_data.keys())
     if len(unique_sizes) < 2: return
@@ -697,6 +815,121 @@ def create_data_scaling_gflops_pdf(radius, size_data, output_dir):
     output_path = os.path.join(output_dir, "data_scaling_gflops.pdf")
     plt.savefig(output_path, dpi=150)
     plt.close(fig)
+
+def create_data_scaling_family_split(radius, size_data, output_dir):
+    unique_sizes = sorted(size_data.keys())
+    if len(unique_sizes) < 2: return
+
+    families = ['Sequential', 'Parallel', 'GPU']
+
+    for family in families:
+        scaling_data_time = defaultdict(lambda: defaultdict(list))
+        has_data_time = False
+
+        for size in unique_sizes:
+            modes = size_data[size]
+            for mode, data in modes.items():
+                _, mode_family = get_arch_style(mode)
+                if mode_family != family:
+                    continue
+
+                for metric in COMPARISON_METRICS:
+                    runs = data['metrics'][metric]
+                    all_vals = [val for run in runs for val in run]
+                    if all_vals:
+                        med_val = statistics.median(all_vals)
+                        scaling_data_time[metric][mode].append((size, med_val))
+                        has_data_time = True
+
+        if has_data_time:
+            num_metrics = len(COMPARISON_METRICS)
+            fig, axes = plt.subplots(1, num_metrics, figsize=(6 * num_metrics, 6))
+            fig.suptitle(f"Data Scaling ({family}) - Fixed R={radius}", fontsize=16, fontweight='bold', y=0.98)
+            
+            axes_list = [axes] if num_metrics == 1 else axes
+
+            lines_handles = []
+            lines_labels = []
+
+            for i, metric in enumerate(COMPARISON_METRICS):
+                ax = axes_list[i]
+                for mode, points in scaling_data_time[metric].items():
+                    if not points: continue
+                    points.sort(key=lambda x: x[0])
+                    xs = [p[0] for p in points]
+                    ys = [p[1] for p in points]
+                    
+                    if ys:
+                        l, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                        if i == 0:
+                            lines_handles.append(l)
+                            lines_labels.append(mode)
+                
+                ax.set_title(metric, fontweight='bold')
+                ax.set_xlabel('Output Elements')
+                ax.set_ylabel('Time (s) [Median]')
+                ax.grid(True, linestyle='--', alpha=0.6)
+                ax.ticklabel_format(style='plain', axis='x')
+
+            if lines_handles:
+                fig.legend(lines_handles, lines_labels, loc='lower center', 
+                           bbox_to_anchor=(0.5, 0.02), ncol=min(len(lines_labels), 3), frameon=False)
+
+            plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+            plt.savefig(os.path.join(output_dir, f"data_scaling_time_{family}.pdf"), dpi=150)
+            plt.close(fig)
+
+        scaling_data_gflops = defaultdict(list)
+        has_data_gflops = False
+        target_metric = "ComputeTimeSec"
+
+        for size in unique_sizes:
+            modes = size_data[size]
+            for mode, data in modes.items():
+                _, mode_family = get_arch_style(mode)
+                if mode_family != family:
+                    continue
+                
+                runs = data['metrics'][target_metric]
+                all_vals = [val for run in runs for val in run]
+                
+                if all_vals:
+                    med_time = statistics.median(all_vals)
+                    gflops_val = calculate_gflops(med_time, size, radius)
+                    scaling_data_gflops[mode].append((size, gflops_val))
+                    has_data_gflops = True
+
+        if has_data_gflops:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            fig.suptitle(f"Data GFLOPS ({family}) - Fixed R={radius}", fontsize=16, fontweight='bold', y=0.98)
+            
+            lines_handles = []
+            lines_labels = []
+
+            for mode, points in scaling_data_gflops.items():
+                if not points: continue
+                points.sort(key=lambda x: x[0])
+                xs = [p[0] for p in points]
+                ys = [p[1] for p in points]
+                
+                if ys:
+                    l, = ax.plot(xs, ys, marker='o', linestyle='-', linewidth=2, markersize=5, label=mode)
+                    lines_handles.append(l)
+                    lines_labels.append(mode)
+
+            ax.set_title("Compute Performance", fontweight='bold')
+            ax.set_xlabel('Output Elements')
+            ax.set_ylabel('Performance (GFLOPS)')
+            ax.grid(True, linestyle='--', alpha=0.6)
+            ax.ticklabel_format(style='plain', axis='x')
+
+            if lines_handles:
+                fig.legend(lines_handles, lines_labels, loc='lower center', 
+                           bbox_to_anchor=(0.5, 0.02), ncol=min(len(lines_labels), 3), frameon=False)
+
+            plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+            plt.savefig(os.path.join(output_dir, f"data_scaling_gflops_{family}.pdf"), dpi=150)
+            plt.close(fig)
 
 # --- TABLE GENERATION ---
 
@@ -1021,6 +1254,7 @@ def process_cross_file_analysis(data, output_dir_base):
         
         create_data_scaling_time_pdf(radius, size_data, radius_dir)
         create_data_scaling_gflops_pdf(radius, size_data, radius_dir)
+        create_data_scaling_family_split(radius, size_data, radius_dir)
         create_data_analysis_table_pdf(radius, size_data, radius_dir)
 
 def process_benchmarks(data, output_dir_base):
@@ -1034,6 +1268,7 @@ def process_benchmarks(data, output_dir_base):
 
         create_radius_scaling_time_pdf(filename, radiuses, file_level_output_dir)
         create_radius_scaling_gflops_pdf(filename, radiuses, file_level_output_dir)
+        create_radius_scaling_family_split(filename, radiuses, file_level_output_dir)
         create_radius_analysis_table_pdf(filename, radiuses, file_level_output_dir)
 
         for radius, modes in radiuses.items():
