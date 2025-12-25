@@ -37,11 +37,10 @@ void convolve_seq_naive(NeonVector& data, NeonVector& outputBuffer, const std::v
     }
 }
 
-template <int Radius, int ChunkSize>
+template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
-    const size_t dataSize = data.size();
-    const size_t outSize = dataSize - KernelSize + 1;
+    const size_t outSize = data.size() - KernelSize + 1;
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
@@ -50,34 +49,30 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
     for (size_t start = 0; start < outSize; start += ChunkSize) {
         const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
-        float* o_chunk = outputPtr + start;
-        const float* d_chunk = dataPtr + start;
+        float* __restrict o_chunk = outputPtr + start;
+        const float* __restrict d_chunk = dataPtr + start;
 
         size_t k = 0;
-        for (; k + 8 <= KernelSize; k += 8) {
-            const float k0 = kernelPtr[k];
-            const float k1 = kernelPtr[k+1];
-            const float k2 = kernelPtr[k+2];
-            const float k3 = kernelPtr[k+3];
-            const float k4 = kernelPtr[k+4];
-            const float k5 = kernelPtr[k+5];
-            const float k6 = kernelPtr[k+6];
-            const float k7 = kernelPtr[k+7];
+        for (; k + KBatch <= KernelSize; k += KBatch) {
+            float k_vals[KBatch];
+            for(int i=0; i<KBatch; ++i) k_vals[i] = kernelPtr[k+i];
 
             #pragma clang loop vectorize(disable)
             for (size_t out = 0; out < actualChunkSize; ++out) {
-                float sum = o_chunk[out];
-                
-                sum += d_chunk[out + k + 0] * k0;
-                sum += d_chunk[out + k + 1] * k1;
-                sum += d_chunk[out + k + 2] * k2;
-                sum += d_chunk[out + k + 3] * k3;
-                sum += d_chunk[out + k + 4] * k4;
-                sum += d_chunk[out + k + 5] * k5;
-                sum += d_chunk[out + k + 6] * k6;
-                sum += d_chunk[out + k + 7] * k7;
-                
-                o_chunk[out] = sum;
+                float acc0 = 0.0f;
+                float acc1 = 0.0f;
+                float acc2 = 0.0f;
+                float acc3 = 0.0f;
+
+                const float* __restrict current_d = d_chunk + out + k;
+                for (int i = 0; i < KBatch; i += 4) {
+                    acc0 += current_d[i + 0] * k_vals[i + 0];
+                    acc1 += current_d[i + 1] * k_vals[i + 1];
+                    acc2 += current_d[i + 2] * k_vals[i + 2];
+                    acc3 += current_d[i + 3] * k_vals[i + 3];
+                }
+
+                o_chunk[out] += (acc0 + acc1 + acc2 + acc3);
             }
         }
 
@@ -91,11 +86,10 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
     }
 }
 
-template <int Radius, int ChunkSize>
+template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
-    const size_t dataSize = data.size();
-    const size_t outSize = dataSize - KernelSize + 1;
+    const size_t outSize = data.size() - KernelSize + 1;
 
     const float* __restrict dataPtr = data.data();
     float* __restrict outputPtr = outputBuffer.data();
@@ -104,34 +98,30 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
     for (size_t start = 0; start < outSize; start += ChunkSize) {
         const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
 
-        float* o_chunk = outputPtr + start;
-        const float* d_chunk = dataPtr + start;
+        float* __restrict o_chunk = outputPtr + start;
+        const float* __restrict d_chunk = dataPtr + start;
 
         size_t k = 0;
-        for (; k + 8 <= KernelSize; k += 8) {
-            const float k0 = kernelPtr[k];
-            const float k1 = kernelPtr[k+1];
-            const float k2 = kernelPtr[k+2];
-            const float k3 = kernelPtr[k+3];
-            const float k4 = kernelPtr[k+4];
-            const float k5 = kernelPtr[k+5];
-            const float k6 = kernelPtr[k+6];
-            const float k7 = kernelPtr[k+7];
+        for (; k + KBatch <= KernelSize; k += KBatch) {
+            float k_vals[KBatch];
+            for(int i=0; i<KBatch; ++i) k_vals[i] = kernelPtr[k+i];
 
             #pragma clang loop vectorize(enable) interleave_count(4)
             for (size_t out = 0; out < actualChunkSize; ++out) {
-                float sum = o_chunk[out];
-                
-                sum += d_chunk[out + k + 0] * k0;
-                sum += d_chunk[out + k + 1] * k1;
-                sum += d_chunk[out + k + 2] * k2;
-                sum += d_chunk[out + k + 3] * k3;
-                sum += d_chunk[out + k + 4] * k4;
-                sum += d_chunk[out + k + 5] * k5;
-                sum += d_chunk[out + k + 6] * k6;
-                sum += d_chunk[out + k + 7] * k7;
-                
-                o_chunk[out] = sum;
+                float acc0 = 0.0f;
+                float acc1 = 0.0f;
+                float acc2 = 0.0f;
+                float acc3 = 0.0f;
+
+                const float* __restrict current_d = d_chunk + out + k;
+                for (int i = 0; i < KBatch; i += 4) {
+                    acc0 += current_d[i + 0] * k_vals[i + 0];
+                    acc1 += current_d[i + 1] * k_vals[i + 1];
+                    acc2 += current_d[i + 2] * k_vals[i + 2];
+                    acc3 += current_d[i + 3] * k_vals[i + 3];
+                }
+
+                o_chunk[out] += (acc0 + acc1 + acc2 + acc3);
             }
         }
 
@@ -145,127 +135,142 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
     }
 }
 
-template <int Radius, int ChunkSize>
+template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
 
-    const float* __restrict dataPtr = static_cast<const float*>(ALIGN_HINT(data.data()));
-    float* __restrict outputPtr = static_cast<float*>(ALIGN_HINT(outputBuffer.data()));
+    const float* __restrict dataPtr = data.data();
+    float* __restrict outputPtr = outputBuffer.data();
     const float* __restrict kernelPtr = convolutionKernel.data();
 
     for (size_t start = 0; start < outSize; start += ChunkSize) {
         const size_t actualChunkSize = std::min(static_cast<size_t>(ChunkSize), outSize - start);
-        
-        float* o_chunk = outputPtr + start;
-        const float* d_chunk = dataPtr + start;
+
+        float* __restrict o_chunk = outputPtr + start;
+        const float* __restrict d_chunk = dataPtr + start;
 
         size_t k = 0;
-        for (; k + 8 <= KernelSize; k += 8) {
-            float32x4_t k0 = vdupq_n_f32(kernelPtr[k]);
-            float32x4_t k1 = vdupq_n_f32(kernelPtr[k + 1]);
-            float32x4_t k2 = vdupq_n_f32(kernelPtr[k + 2]);
-            float32x4_t k3 = vdupq_n_f32(kernelPtr[k + 3]);
-            float32x4_t k4 = vdupq_n_f32(kernelPtr[k + 4]);
-            float32x4_t k5 = vdupq_n_f32(kernelPtr[k + 5]);
-            float32x4_t k6 = vdupq_n_f32(kernelPtr[k + 6]);
-            float32x4_t k7 = vdupq_n_f32(kernelPtr[k + 7]);
 
-            size_t i = 0;
-            
-            for (; i + 16 <= actualChunkSize; i += 16) {
-                
-                __builtin_prefetch(d_chunk + i + k + PREFETCH_LOOKAHEAD, 0, 1);
-                
-                float32x4_t acc0 = vld1q_f32(o_chunk + i);
-                float32x4_t acc1 = vld1q_f32(o_chunk + i + 4);
-                float32x4_t acc2 = vld1q_f32(o_chunk + i + 8);
-                float32x4_t acc3 = vld1q_f32(o_chunk + i + 12);
-                
-                const float* d = d_chunk + i + k;
+        for (; k + KBatch <= KernelSize; k += KBatch) {
+            const float* k_ptr_base = kernelPtr + k;
+            size_t out = 0;
 
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 0),  k0);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 4),  k0);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 8),  k0);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 12), k0);
+            for (; out + 16 <= actualChunkSize; out += 16) {
+                float32x4_t acc0_A = vdupq_n_f32(0.0f); float32x4_t acc1_A = vdupq_n_f32(0.0f);
+                float32x4_t acc2_A = vdupq_n_f32(0.0f); float32x4_t acc3_A = vdupq_n_f32(0.0f);
+                float32x4_t acc0_B = vdupq_n_f32(0.0f); float32x4_t acc1_B = vdupq_n_f32(0.0f);
+                float32x4_t acc2_B = vdupq_n_f32(0.0f); float32x4_t acc3_B = vdupq_n_f32(0.0f);
+                float32x4_t acc0_C = vdupq_n_f32(0.0f); float32x4_t acc1_C = vdupq_n_f32(0.0f);
+                float32x4_t acc2_C = vdupq_n_f32(0.0f); float32x4_t acc3_C = vdupq_n_f32(0.0f);
+                float32x4_t acc0_D = vdupq_n_f32(0.0f); float32x4_t acc1_D = vdupq_n_f32(0.0f);
+                float32x4_t acc2_D = vdupq_n_f32(0.0f); float32x4_t acc3_D = vdupq_n_f32(0.0f);
 
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 1),  k1);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 5),  k1);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 9),  k1);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 13), k1);
+                const float* current_d = d_chunk + out + k;
 
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 2),  k2);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 6),  k2);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 10), k2);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 14), k2);
+                for (int i = 0; i < KBatch; i += 4) {
+                    float32x4_t k0 = vdupq_n_f32(k_ptr_base[i + 0]);
+                    float32x4_t k1 = vdupq_n_f32(k_ptr_base[i + 1]);
+                    float32x4_t k2 = vdupq_n_f32(k_ptr_base[i + 2]);
+                    float32x4_t k3 = vdupq_n_f32(k_ptr_base[i + 3]);
 
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 3),  k3);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 7),  k3);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 11), k3);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 15), k3);
-
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 4),  k4);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 8),  k4);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 12), k4);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 16), k4);
-
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 5),  k5);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 9),  k5);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 13), k5);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 17), k5);
-
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 6),  k6);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 10), k6);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 14), k6);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 18), k6);
-
-                acc0 = vfmaq_f32(acc0, vld1q_f32(d + 7),  k7);
-                acc1 = vfmaq_f32(acc1, vld1q_f32(d + 11), k7);
-                acc2 = vfmaq_f32(acc2, vld1q_f32(d + 15), k7);
-                acc3 = vfmaq_f32(acc3, vld1q_f32(d + 19), k7);
-
-                vst1q_f32(o_chunk + i,     acc0);
-                vst1q_f32(o_chunk + i + 4, acc1);
-                vst1q_f32(o_chunk + i + 8, acc2);
-                vst1q_f32(o_chunk + i + 12, acc3);
-            }
-
-            for (; i + 4 <= actualChunkSize; i += 4) {
-                float32x4_t acc = vld1q_f32(o_chunk + i);
-                const float* d = d_chunk + i + k;
-                acc = vfmaq_f32(acc, vld1q_f32(d + 0), k0);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 1), k1);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 2), k2);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 3), k3);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 4), k4);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 5), k5);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 6), k6);
-                acc = vfmaq_f32(acc, vld1q_f32(d + 7), k7);
-                vst1q_f32(o_chunk + i, acc);
-            }
-            
-            #pragma clang loop vectorize(disable)
-            for (; i < actualChunkSize; ++i) {
-                for (size_t kk = 0; kk < 8; ++kk) {
-                    o_chunk[i] += d_chunk[i + k + kk] * kernelPtr[k + kk];
+                    acc0_A = vfmaq_f32(acc0_A, vld1q_f32(current_d + i + 0), k0);
+                    acc1_A = vfmaq_f32(acc1_A, vld1q_f32(current_d + i + 1), k1);
+                    acc2_A = vfmaq_f32(acc2_A, vld1q_f32(current_d + i + 2), k2);
+                    acc3_A = vfmaq_f32(acc3_A, vld1q_f32(current_d + i + 3), k3);
+        
+                    acc0_B = vfmaq_f32(acc0_B, vld1q_f32(current_d + i + 4), k0);
+                    acc1_B = vfmaq_f32(acc1_B, vld1q_f32(current_d + i + 5), k1);
+                    acc2_B = vfmaq_f32(acc2_B, vld1q_f32(current_d + i + 6), k2);
+                    acc3_B = vfmaq_f32(acc3_B, vld1q_f32(current_d + i + 7), k3);
+                    
+                    acc0_C = vfmaq_f32(acc0_C, vld1q_f32(current_d + i + 8), k0);
+                    acc1_C = vfmaq_f32(acc1_C, vld1q_f32(current_d + i + 9), k1);
+                    acc2_C = vfmaq_f32(acc2_C, vld1q_f32(current_d + i + 10), k2);
+                    acc3_C = vfmaq_f32(acc3_C, vld1q_f32(current_d + i + 11), k3);
+                    
+                    acc0_D = vfmaq_f32(acc0_D, vld1q_f32(current_d + i + 12), k0);
+                    acc1_D = vfmaq_f32(acc1_D, vld1q_f32(current_d + i + 13), k1);
+                    acc2_D = vfmaq_f32(acc2_D, vld1q_f32(current_d + i + 14), k2);
+                    acc3_D = vfmaq_f32(acc3_D, vld1q_f32(current_d + i + 15), k3);
                 }
+                
+                float32x4_t sum_A = vaddq_f32(vaddq_f32(acc0_A, acc1_A), vaddq_f32(acc2_A, acc3_A));
+                vst1q_f32(o_chunk + out, vaddq_f32(vld1q_f32(o_chunk + out), sum_A));
+                
+                float32x4_t sum_B = vaddq_f32(vaddq_f32(acc0_B, acc1_B), vaddq_f32(acc2_B, acc3_B));
+                vst1q_f32(o_chunk + out + 4, vaddq_f32(vld1q_f32(o_chunk + out + 4), sum_B));
+                
+                float32x4_t sum_C = vaddq_f32(vaddq_f32(acc0_C, acc1_C), vaddq_f32(acc2_C, acc3_C));
+                vst1q_f32(o_chunk + out + 8, vaddq_f32(vld1q_f32(o_chunk + out + 8), sum_C));
+                
+                float32x4_t sum_D = vaddq_f32(vaddq_f32(acc0_D, acc1_D), vaddq_f32(acc2_D, acc3_D));
+                vst1q_f32(o_chunk + out + 12, vaddq_f32(vld1q_f32(o_chunk + out + 12), sum_D));
+            }
+            
+            for (; out < actualChunkSize; ++out) {
+                float acc = 0.0f;
+                const float* current_d = d_chunk + out + k;
+                for (int i = 0; i < KBatch; ++i) acc += current_d[i] * k_ptr_base[i];
+                o_chunk[out] += acc;
+            }
+        }
+
+        for (; k + 4 <= KernelSize; k += 4) {
+            const float* k_ptr_base = kernelPtr + k;
+            size_t out = 0;
+
+            for (; out + 16 <= actualChunkSize; out += 16) {
+                float32x4_t k0 = vdupq_n_f32(k_ptr_base[0]);
+                float32x4_t k1 = vdupq_n_f32(k_ptr_base[1]);
+                float32x4_t k2 = vdupq_n_f32(k_ptr_base[2]);
+                float32x4_t k3 = vdupq_n_f32(k_ptr_base[3]);
+
+                const float* current_d = d_chunk + out + k;
+                
+                float32x4_t d_A0 = vld1q_f32(current_d + 0); float32x4_t d_A1 = vld1q_f32(current_d + 1);
+                float32x4_t d_A2 = vld1q_f32(current_d + 2); float32x4_t d_A3 = vld1q_f32(current_d + 3);
+                float32x4_t acc_A = vfmaq_f32(vmulq_f32(d_A0, k0), d_A1, k1);
+                acc_A = vfmaq_f32(acc_A, d_A2, k2); acc_A = vfmaq_f32(acc_A, d_A3, k3);
+
+                float32x4_t d_B0 = vld1q_f32(current_d + 4); float32x4_t d_B1 = vld1q_f32(current_d + 5);
+                float32x4_t d_B2 = vld1q_f32(current_d + 6); float32x4_t d_B3 = vld1q_f32(current_d + 7);
+                float32x4_t acc_B = vfmaq_f32(vmulq_f32(d_B0, k0), d_B1, k1);
+                acc_B = vfmaq_f32(acc_B, d_B2, k2); acc_B = vfmaq_f32(acc_B, d_B3, k3);
+
+                float32x4_t d_C0 = vld1q_f32(current_d + 8); float32x4_t d_C1 = vld1q_f32(current_d + 9);
+                float32x4_t d_C2 = vld1q_f32(current_d + 10); float32x4_t d_C3 = vld1q_f32(current_d + 11);
+                float32x4_t acc_C = vfmaq_f32(vmulq_f32(d_C0, k0), d_C1, k1);
+                acc_C = vfmaq_f32(acc_C, d_C2, k2); acc_C = vfmaq_f32(acc_C, d_C3, k3);
+
+                float32x4_t d_D0 = vld1q_f32(current_d + 12); float32x4_t d_D1 = vld1q_f32(current_d + 13);
+                float32x4_t d_D2 = vld1q_f32(current_d + 14); float32x4_t d_D3 = vld1q_f32(current_d + 15);
+                float32x4_t acc_D = vfmaq_f32(vmulq_f32(d_D0, k0), d_D1, k1);
+                acc_D = vfmaq_f32(acc_D, d_D2, k2); acc_D = vfmaq_f32(acc_D, d_D3, k3);
+
+                vst1q_f32(o_chunk + out, vaddq_f32(vld1q_f32(o_chunk + out), acc_A));
+                vst1q_f32(o_chunk + out + 4, vaddq_f32(vld1q_f32(o_chunk + out + 4), acc_B));
+                vst1q_f32(o_chunk + out + 8, vaddq_f32(vld1q_f32(o_chunk + out + 8), acc_C));
+                vst1q_f32(o_chunk + out + 12, vaddq_f32(vld1q_f32(o_chunk + out + 12), acc_D));
+            }
+
+            for (; out < actualChunkSize; ++out) {
+                float acc = 0.0f;
+                const float* current_d = d_chunk + out + k;
+                for (int i = 0; i < 4; ++i) acc += current_d[i] * k_ptr_base[i];
+                o_chunk[out] += acc;
             }
         }
 
         for (; k < KernelSize; ++k) {
             float kv_scalar = kernelPtr[k];
             float32x4_t k_vec = vdupq_n_f32(kv_scalar);
-            size_t i = 0;
-            for (; i + 4 <= actualChunkSize; i += 4) {
-                float32x4_t o = vld1q_f32(o_chunk + i);
-                float32x4_t d = vld1q_f32(d_chunk + i + k);
-                o = vfmaq_f32(o, d, k_vec);
-                vst1q_f32(o_chunk + i, o);
+            size_t out = 0;
+            for (; out + 4 <= actualChunkSize; out += 4) {
+                vst1q_f32(o_chunk + out, vfmaq_f32(vld1q_f32(o_chunk + out), vld1q_f32(d_chunk + out + k), k_vec));
             }
-            
-            #pragma clang loop vectorize(disable)
-            for (; i < actualChunkSize; ++i) {
-                o_chunk[i] += d_chunk[i + k] * kv_scalar;
+            for (; out < actualChunkSize; ++out) {
+                o_chunk[out] += d_chunk[out + k] * kv_scalar;
             }
         }
     }

@@ -14,7 +14,7 @@
 #include "convolve_gpu/convolve_gpu.hpp"
 #include <chrono>
 
-template <int Radius, int ChunkSize>
+template <int Radius, int ChunkSize, int KBatch>
 ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
     
     auto mem_start = std::chrono::high_resolution_clock::now();
@@ -35,25 +35,25 @@ ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, co
             convolve_seq_naive<Radius>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_NO_VEC:
-            convolve_seq_no_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_no_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_AUTO_VEC:
-            convolve_seq_auto_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_auto_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_MANUAL_VEC:
-            convolve_seq_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_manual_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NAIVE:
             convolve_par_naive<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
-            convolve_par_no_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_par_no_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_AUTO_VEC:
-            convolve_par_auto_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_par_auto_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_MANUAL_VEC:
-            convolve_par_manual_vec<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_par_manual_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::GPU_NAIVE:
             gpuStats = convolve_gpu_naive<Radius>(allData, outputBuffer, convolutionKernel);

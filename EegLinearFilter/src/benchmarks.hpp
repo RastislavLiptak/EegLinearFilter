@@ -124,7 +124,7 @@ void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, 
         
         std::cout << "Run " << (i + 1) << ": running..." << std::flush;
         
-        ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE>(mode, *workingDataPtr, convolutionKernel);
+        ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE, K_BATCH>(mode, *workingDataPtr, convolutionKernel);
         log_benchmark_result<KERNEL_RADIUS>(
             std::string(magic_enum::enum_name(mode)),
             inputFilename,
