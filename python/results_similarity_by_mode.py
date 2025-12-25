@@ -8,8 +8,8 @@ import pyedflib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
-EXPORT_DETAILED_CSV = True
-VISUALIZE_ERRORS = True
+EXPORT_DETAILED_CSV = False
+VISUALIZE_ERRORS = False
 DATA_FOLDER = "EegLinearFilter/out"
 OUTPUT_ROOT = "python/results_similarity"
 FOLDER_CSV = os.path.join(OUTPUT_ROOT, "csv_tables")

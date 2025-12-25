@@ -15,13 +15,12 @@
 #include <chrono>
 
 template <int Radius, int ChunkSize, int KBatch>
-ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, const std::vector<float>& convolutionKernel) {
-    
+ProcessingStats run_processor(const ProcessingMode mode, const NeonVector& inputData, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     auto mem_start = std::chrono::high_resolution_clock::now();
-    NeonVector outputBuffer(allData.size(), 0.0f);
+    std::fill(outputBuffer.begin(), outputBuffer.end(), 0.0f);
     auto mem_end = std::chrono::high_resolution_clock::now();
     double memoryTime = std::chrono::duration<double>(mem_end - mem_start).count();
-    
+
     const auto start = std::chrono::high_resolution_clock::now();
     
     ProcessingStats gpuStats = {0.0, 0.0, 0.0, 0.0, 0.0};
@@ -29,42 +28,42 @@ ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, co
 
     switch (mode) {
         case ProcessingMode::CPU_SEQ_APPLE:
-            convolve_seq_apple<Radius>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_apple<Radius>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_NAIVE:
-            convolve_seq_naive<Radius>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_naive<Radius>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_NO_VEC:
-            convolve_seq_no_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_no_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_AUTO_VEC:
-            convolve_seq_auto_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_auto_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_SEQ_MANUAL_VEC:
-            convolve_seq_manual_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_seq_manual_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NAIVE:
-            convolve_par_naive<Radius, ChunkSize>(allData, outputBuffer, convolutionKernel);
+            convolve_par_naive<Radius, ChunkSize>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_NO_VEC:
-            convolve_par_no_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_par_no_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_AUTO_VEC:
-            convolve_par_auto_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_par_auto_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::CPU_PAR_MANUAL_VEC:
-            convolve_par_manual_vec<Radius, ChunkSize, KBatch>(allData, outputBuffer, convolutionKernel);
+            convolve_par_manual_vec<Radius, ChunkSize, KBatch>(inputData, outputBuffer, convolutionKernel);
             break;
         case ProcessingMode::GPU_NAIVE:
-            gpuStats = convolve_gpu_naive<Radius>(allData, outputBuffer, convolutionKernel);
+            gpuStats = convolve_gpu_naive<Radius>(inputData, outputBuffer, convolutionKernel);
             isGpu = true;
             break;
         case ProcessingMode::GPU_16BIT:
-            gpuStats = convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel, true);
+            gpuStats = convolve_gpu<Radius>(inputData, outputBuffer, convolutionKernel, true);
             isGpu = true;
             break;
         case ProcessingMode::GPU_32BIT:
-            gpuStats = convolve_gpu<Radius>(allData, outputBuffer, convolutionKernel, false);
+            gpuStats = convolve_gpu<Radius>(inputData, outputBuffer, convolutionKernel, false);
             isGpu = true;
             break;
         default:
@@ -73,15 +72,6 @@ ProcessingStats run_processor(const ProcessingMode mode, NeonVector& allData, co
     
     const auto end = std::chrono::high_resolution_clock::now();
     const std::chrono::duration<double> elapsed = end - start;
-    
-    mem_start = std::chrono::high_resolution_clock::now();
-
-    allData.swap(outputBuffer);
-    outputBuffer.clear();
-    outputBuffer.shrink_to_fit();
-    
-    mem_end = std::chrono::high_resolution_clock::now();
-    memoryTime += std::chrono::duration<double>(mem_end - mem_start).count();
     
     if (isGpu) {
         gpuStats.cpuMemoryOpsSec += memoryTime;

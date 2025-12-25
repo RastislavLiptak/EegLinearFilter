@@ -36,18 +36,18 @@ int main(int argc, const char * argv[]) {
         
         try {
             const std::vector<float> convolutionKernel = create_gaussian_kernel<KERNEL_RADIUS>(KERNEL_SIGMA);
-            EdfData loadedData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
+            const EdfData loadedData = load_edf_data(config.filePath.c_str(), KERNEL_RADIUS);
+            NeonVector outputBuffer(loadedData.samples.size(), 0.0f);
             
             if (config.runAllVariants) {
                 std::cout << "Starting benchmark suite" << std::endl;
                 std::cout << "========================================\n";
                 
                 for (int i = 0; i < (int)ProcessingMode::COUNT; ++i) {
-                    NeonVector workingData = loadedData.samples;
-                    run_benchmark(static_cast<ProcessingMode>(i), fs::path(config.filePath).filename().string(), workingData, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
+                    run_benchmark(static_cast<ProcessingMode>(i), fs::path(config.filePath).filename().string(), loadedData, outputBuffer, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
                 }
             } else {
-                run_benchmark(config.mode.value(), fs::path(config.filePath).filename().string(), loadedData.samples, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath, loadedData);
+                run_benchmark(config.mode.value(), fs::path(config.filePath).filename().string(), loadedData, outputBuffer, convolutionKernel, config.iterationCount, config.saveResults, config.outputFolderPath);
             }
             
             std::cout << "Done!" << std::endl;

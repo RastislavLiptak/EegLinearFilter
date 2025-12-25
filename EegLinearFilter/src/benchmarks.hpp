@@ -104,27 +104,17 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     std::cout << "========================================\n";
 }
 
-void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, NeonVector& cleanData, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath, const EdfData& originalData) {
+void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, const EdfData& loadedData, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath) {
     std::cout << "Mode: " << magic_enum::enum_name(mode) << std::endl;
     std::cout << "----------------------------------------\n";
     
-    NeonVector tempData;
-    NeonVector* workingDataPtr = nullptr;
-    
-    const size_t dataSize = cleanData.size();
+    const size_t dataSize = loadedData.samples.size();
     std::vector<ProcessingStats> stats_collection(benchmark_iteration_count);
     
     for (int i = 0; i < benchmark_iteration_count; ++i) {
-        if (benchmark_iteration_count == 1) {
-            workingDataPtr = &cleanData;
-        } else {
-            tempData = cleanData;
-            workingDataPtr = &tempData;
-        }
-        
         std::cout << "Run " << (i + 1) << ": running..." << std::flush;
         
-        ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE, K_BATCH>(mode, *workingDataPtr, convolutionKernel);
+        ProcessingStats stats = run_processor<KERNEL_RADIUS, CHUNK_SIZE, K_BATCH>(mode, loadedData.samples, outputBuffer, convolutionKernel);
         log_benchmark_result<KERNEL_RADIUS>(
             std::string(magic_enum::enum_name(mode)),
             inputFilename,
@@ -148,12 +138,7 @@ void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, 
     
     if (save_results) {
         std::string outputFilename = outputFolderPath + std::string(magic_enum::enum_name(mode)) + ".edf";
-        save_data(*workingDataPtr, outputFilename, convolutionKernel, originalData);
-        
-        if (benchmark_iteration_count > 1) {
-            tempData.clear();
-            tempData.shrink_to_fit();
-        }
+        save_data(outputBuffer, outputFilename, convolutionKernel, loadedData);
     }
 }
 

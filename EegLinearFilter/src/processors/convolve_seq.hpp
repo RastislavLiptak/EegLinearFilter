@@ -16,7 +16,7 @@
 #define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
 
 template <int Radius>
-void convolve_seq_apple(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void convolve_seq_apple(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t dataSize = data.size();
     const size_t outSize = dataSize - KernelSize + 1;
@@ -25,7 +25,7 @@ void convolve_seq_apple(NeonVector& data, NeonVector& outputBuffer, const std::v
 }
 
 template <int Radius>
-void convolve_seq_naive(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void convolve_seq_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
     
     for (size_t i = static_cast<size_t>(Radius); i < dataSize - static_cast<size_t>(Radius); ++i) {
@@ -38,7 +38,7 @@ void convolve_seq_naive(NeonVector& data, NeonVector& outputBuffer, const std::v
 }
 
 template <int Radius, int ChunkSize, int KBatch>
-void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void convolve_seq_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
 
@@ -87,7 +87,7 @@ void convolve_seq_no_vec(NeonVector& data, NeonVector& outputBuffer, const std::
 }
 
 template <int Radius, int ChunkSize, int KBatch>
-void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void convolve_seq_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
 
@@ -136,7 +136,7 @@ void convolve_seq_auto_vec(NeonVector& data, NeonVector& outputBuffer, const std
 }
 
 template <int Radius, int ChunkSize, int KBatch>
-void convolve_seq_manual_vec(NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
+void convolve_seq_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
     const size_t outSize = data.size() - KernelSize + 1;
 
