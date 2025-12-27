@@ -58,10 +58,6 @@ ProcessingStats run_processor(const ProcessingMode mode, const NeonVector& input
             gpuStats = convolve_gpu_naive<Radius>(inputData, outputBuffer, convolutionKernel);
             isGpu = true;
             break;
-        case ProcessingMode::GPU_16BIT:
-            gpuStats = convolve_gpu<Radius>(inputData, outputBuffer, convolutionKernel, true);
-            isGpu = true;
-            break;
         case ProcessingMode::GPU_32BIT:
             gpuStats = convolve_gpu<Radius>(inputData, outputBuffer, convolutionKernel, false);
             isGpu = true;

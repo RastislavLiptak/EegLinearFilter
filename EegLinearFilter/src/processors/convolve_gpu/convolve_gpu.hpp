@@ -29,7 +29,6 @@ struct MetalContext {
     
     MTL::ComputePipelineState* pipelineStateNaive = nullptr;
     MTL::ComputePipelineState* pipelineState32 = nullptr;
-    MTL::ComputePipelineState* pipelineState16 = nullptr;
 
     MetalContext() {
         device = MTL::CreateSystemDefaultDevice();
@@ -45,7 +44,6 @@ struct MetalContext {
         
         pipelineStateNaive = createPipeline(library, "convolve_kernel_naive");
         pipelineState32 = createPipeline(library, "convolve_kernel_32");
-        pipelineState16 = createPipeline(library, "convolve_kernel_16");
         
         library->release();
     }
@@ -73,7 +71,6 @@ struct MetalContext {
     ~MetalContext() {
         if (pipelineStateNaive) pipelineStateNaive->release();
         if (pipelineState32) pipelineState32->release();
-        if (pipelineState16) pipelineState16->release();
         if (commandQueue) commandQueue->release();
         if (device) device->release();
     }
@@ -188,13 +185,6 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     uint32_t rawDataSize = (uint32_t)data.size();
     
     MetalContext& ctx = MetalContext::get();
-    
-    MTL::ComputePipelineState* currentPipeline = useHalfPrecision ? ctx.pipelineState16 : ctx.pipelineState32;
-    
-    if (!currentPipeline) {
-         throw std::runtime_error("Requested pipeline state is null!");
-    }
-
     auto mem_start = std::chrono::high_resolution_clock::now();
     
     MTL::Buffer* dataBuffer = ctx.device->newBuffer(
@@ -225,7 +215,7 @@ ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, c
     MTL::CommandBuffer* commandBuffer = ctx.commandQueue->commandBuffer();
     MTL::ComputeCommandEncoder* computeEncoder = commandBuffer->computeCommandEncoder();
     
-    computeEncoder->setComputePipelineState(currentPipeline);
+    computeEncoder->setComputePipelineState(ctx.pipelineState32);
     
     computeEncoder->setBuffer(dataBuffer, 0, 0);
     computeEncoder->setBuffer(outBuffer, 0, 1);
