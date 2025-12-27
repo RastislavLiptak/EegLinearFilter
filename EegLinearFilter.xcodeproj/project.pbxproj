@@ -312,6 +312,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = TG9Q2M88Z2;
 				ENABLE_HARDENED_RUNTIME = YES;
+				"EXCLUDED_ARCHS[sdk=*]" = x86_64;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/EegLinearFilter/lib/metal-cpp";
 				MTL_COMPILER_FLAGS = "-ffast-math";
 				MTL_OPTIMIZATION_LEVEL = "-O3";
