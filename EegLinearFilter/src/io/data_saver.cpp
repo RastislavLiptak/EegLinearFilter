@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 22.11.2025.
+//  Implementation of EDF file saving/export functionality.
 //
 
 #include "io.hpp"
@@ -13,6 +14,7 @@
 #include <stdexcept>
 #include <cstring>
 
+// Helper to copy strings safely into fixed-size buffers.
 void copy_string_to_buffer(char* buffer, const std::string& source, size_t size) {
     memset(buffer, ' ', size);
     size_t len = source.length();
@@ -21,6 +23,15 @@ void copy_string_to_buffer(char* buffer, const std::string& source, size_t size)
     buffer[size] = '\0';
 }
 
+/**
+ * Saves processed data to a new EDF file.
+ * Handles header creation and writing of physical samples.
+ *
+ * @param processedData Vector containing the filtered float data.
+ * @param filepath Output file path.
+ * @param convolutionKernel The kernel used (needed to calculate invalid border samples).
+ * @param sourceData Original EdfData structure to copy metadata from.
+ */
 void save_data(const NeonVector& processedData, const std::string& filepath, const std::vector<float>& convolutionKernel, const EdfData& sourceData) {
     std::cout << "Exporting to EDF: " << filepath << "..." << std::endl;
 

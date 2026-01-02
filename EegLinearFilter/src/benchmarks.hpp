@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 01.12.2025.
+//  Header file containing functions for benchmarking, performance metric calculation, and result logging.
 //
 
 #ifndef BENCHMARKS_HPP
@@ -19,6 +20,17 @@
 
 namespace fs = std::filesystem;
 
+/**
+ * Appends the results of a single benchmark iteration to a CSV file.
+ * Creates the logs directory and the CSV file if they do not exist.
+ *
+ * @param mode The processing mode used (e.g., CPU_SEQ, GPU).
+ * @param filename Name of the processed file.
+ * @param outputElements Number of elements actually processed (excluding padding/borders).
+ * @param iteration Current iteration number.
+ * @param totalIterations Total number of iterations scheduled.
+ * @param stats struct containing timing and memory operation metrics.
+ */
 template <int Radius>
 void log_benchmark_result(const std::string& mode, const std::string& filename, const size_t outputElements, const int iteration, const int totalIterations, const ProcessingStats& stats) {
     
@@ -55,6 +67,13 @@ void log_benchmark_result(const std::string& mode, const std::string& filename, 
     }
 }
 
+/**
+ * Aggregates statistics from multiple runs, calculates average performance metrics
+ * (Throughput in MSamples/s and Performance in GFLOPS), and prints them to stdout.
+ *
+ * @param stats Vector containing statistics for each benchmark run.
+ * @param dataSize Total size of the input data.
+ */
 template <int Radius>
 void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -104,6 +123,19 @@ void calc_benchmarks(const std::vector<ProcessingStats>& stats, size_t dataSize)
     std::cout << "========================================\n";
 }
 
+/**
+ * Orchestrates the benchmark execution loop for a specific processing mode.
+ * Runs the processor multiple times, logs results, calculates averages, and optionally saves output.
+ *
+ * @param mode The specific ProcessingMode to benchmark.
+ * @param inputFilename Name of the input file for logging purposes.
+ * @param loadedData struct containing input samples and metadata.
+ * @param outputBuffer Pre-allocated vector for storing results.
+ * @param convolutionKernel The 1D kernel weights.
+ * @param benchmark_iteration_count Number of times to repeat the benchmark.
+ * @param save_results Flag indicating whether to save the filtered data to disk.
+ * @param outputFolderPath Directory path where the output file should be saved.
+ */
 void run_benchmark(const ProcessingMode mode, const std::string& inputFilename, const EdfData& loadedData, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, const int benchmark_iteration_count, const bool save_results, const std::string& outputFolderPath) {
     std::cout << "Mode: " << magic_enum::enum_name(mode) << std::endl;
     std::cout << "----------------------------------------\n";

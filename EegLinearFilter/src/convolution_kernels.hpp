@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 19.11.2025.
+//  Header file containing functions for generating convolution kernels used in signal filtering.
 //
 
 #ifndef CONVOLUTION_KERNELS_HPP
@@ -12,6 +13,14 @@
 #include <cmath>
 #include <iostream>
 
+/**
+ * Creates a normalized 1D Gaussian kernel.
+ *
+ * @tparam Radius The half-size of the kernel (Total Size = 2 * Radius + 1).
+ * @param sigma Standard deviation of the Gaussian distribution.
+ * @return A vector of floats containing the normalized kernel weights.
+ * @throws std::runtime_error if sigma is non-positive.
+ */
 template <int Radius>
 std::vector<float> create_gaussian_kernel(const float sigma) {
     static_assert(Radius >= 0, "Gaussian kernel radius cannot be negative");

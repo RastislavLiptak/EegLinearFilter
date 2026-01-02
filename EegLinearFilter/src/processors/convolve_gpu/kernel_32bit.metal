@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 26.11.2025.
+//  Optimized Metal compute shader for 1D convolution using register tiling.
 //
 
 #include <metal_stdlib>
@@ -10,6 +11,20 @@
 
 using namespace metal;
 
+/**
+ * Optimized compute kernel.
+ * * Strategy:
+ * 1. Loads a block of data into shared memory (threadgroup memory).
+ * 2. Uses register tiling to compute multiple output values per thread to hide memory latency.
+ * 3. Manually unrolls loops (16x unroll) to maximize arithmetic density.
+ * * @param data Global buffer containing input signal.
+ * @param output Global buffer for results.
+ * @param convKernel Global buffer containing kernel weights.
+ * @param kernelSize Size of the kernel.
+ * @param outSize Expected size of the valid output.
+ * @param rawDataSize Total size of the input buffer (for bounds checking).
+ * @param cache Threadgroup shared memory buffer.
+ */
 kernel void convolve_kernel_32(
     device const float4* data [[buffer(0)]],
     device float4* output [[buffer(1)]],
@@ -24,6 +39,7 @@ kernel void convolve_kernel_32(
 ) {
     int groupStartGlobal = group_id * TILE_SIZE;
     
+    // Accumulators for register tiling (processing 4 vectors / 16 floats at once)float4 sumA = float4(0.0f);
     float4 sumA = float4(0.0f);
     float4 sumB = float4(0.0f);
     float4 sumC = float4(0.0f);
@@ -32,6 +48,7 @@ kernel void convolve_kernel_32(
     int localBaseIndex = tid * ITEMS_PER_THREAD;
     threadgroup float* scalarCache = (threadgroup float*)cache;
 
+    // Process kernel in segments to fit data into limited threadgroup memory
     for (int k_base = 0; k_base < (int)kernelSize; k_base += KERNEL_SEGMENT_SIZE) {
         int currentSegmentLen = min((int)KERNEL_SEGMENT_SIZE, (int)kernelSize - k_base);
         int elementsNeeded = TILE_SIZE + currentSegmentLen - 1;
@@ -46,6 +63,7 @@ kernel void convolve_kernel_32(
             safeVectorsCount = vectorsNeeded;
         }
 
+        // Cooperative loading into shared memory
         int i = tid;
         while (i < safeVectorsCount) {
             int absoluteIdx = dataOffset + (i * 4);
@@ -53,6 +71,7 @@ kernel void convolve_kernel_32(
             i += THREADS_PER_GROUP;
         }
 
+        // Handle edge cases (partial vectors at end of data)
         while (i < vectorsNeeded) {
             int absoluteIdx = dataOffset + (i * 4);
             
@@ -72,6 +91,7 @@ kernel void convolve_kernel_32(
 
         threadgroup_barrier(mem_flags::mem_threadgroup);
 
+        // Preload cache values into registers
         float v0 = scalarCache[localBaseIndex + 0];
         float v1 = scalarCache[localBaseIndex + 1];
         float v2 = scalarCache[localBaseIndex + 2];
@@ -92,6 +112,7 @@ kernel void convolve_kernel_32(
         int k = 0;
         int limitLoop = currentSegmentLen - 15;
         
+        // Main compute loop
         for (; k < limitLoop; k += 16) {
             float w;
             int kernelIdx = k_base + k;
@@ -209,6 +230,7 @@ kernel void convolve_kernel_32(
             v15 = scalarCache[localBaseIndex + k + 31];
         }
         
+        // Handle remaining kernel elements in this segment
         for (; k < currentSegmentLen; ++k) {
             float w = convKernel[k_base + k];
             sumA = fma(float4(v0, v1, v2, v3), float4(w), sumA);

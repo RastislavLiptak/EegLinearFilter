@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 25.11.2025.
+//  Sequential (single-threaded) convolution implementations.
 //
 
 #ifndef CONVOLVE_SEQ
@@ -13,6 +14,11 @@
 #include <arm_neon.h>
 #include <vector>
 
+/**
+ * Implementation using Apple's Accelerate framework (vDSP).
+ *
+ * @tparam Radius Kernel radius (used to calculate kernel size).
+ */
 template <int Radius>
 void convolve_seq_apple(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -22,6 +28,9 @@ void convolve_seq_apple(const NeonVector& data, NeonVector& outputBuffer, const 
     vDSP_conv(data.data(), 1, convolutionKernel.data(), 1, outputBuffer.data(), 1, outSize, KernelSize);
 }
 
+/**
+ * Basic sequential naive implementation.
+ */
 template <int Radius>
 void convolve_seq_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
@@ -35,6 +44,9 @@ void convolve_seq_naive(const NeonVector& data, NeonVector& outputBuffer, const 
     }
 }
 
+/**
+ * Sequential implementation with vectorization explicitly disabled.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -84,6 +96,9 @@ void convolve_seq_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
     }
 }
 
+/**
+ * Sequential implementation using compiler auto-vectorization hints.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -133,6 +148,9 @@ void convolve_seq_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
     }
 }
 
+/**
+ * Sequential implementation using manual ARM Neon Intrinsics.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_seq_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;

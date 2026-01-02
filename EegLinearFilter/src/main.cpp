@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 18.11.2025.
+//  Main entry point of the application. Handles user interaction, configuration, data loading, and benchmark execution loop.
 //
 
 #include <IOKit/pwr_mgt/IOPMLib.h>
@@ -24,7 +25,13 @@ void print_welcome_banner() {
     std::cout << "========================================" << std::endl;
 }
 
+/**
+ * Main application loop.
+ * Sets up MacOS power assertions to prevent sleep, loads configuration and data,
+ * and runs the requested benchmarks.
+ */
 int main(int argc, const char * argv[]) {
+    // Prevent system sleep during benchmarking
     IOPMAssertionID assertionID;
     CFStringRef reasonForActivity = CFSTR("EegLinearFilter Benchmark Running");
     IOReturn success = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep, kIOPMAssertionLevelOn, reasonForActivity, &assertionID);

@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 02.12.2025.
+//  Implementation of file downloading functionality using libcurl
 //
 
 #include "io.hpp"
@@ -16,6 +17,11 @@
 
 namespace fs = std::filesystem;
 
+/**
+ * Formats a byte count into a human-readable string (e.g., "1.5 MB").
+ * @param bytes The number of bytes.
+ * @return Formatted string.
+ */
 std::string format_bytes(curl_off_t bytes) {
     const char* suffixes[] = {"B", "KB", "MB", "GB", "TB"};
     int suffix_index = 0;
@@ -31,11 +37,17 @@ std::string format_bytes(curl_off_t bytes) {
     return ss.str();
 }
 
+/**
+ * Callback function for libcurl to write received data to a file stream.
+ */
 size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
     size_t written = fwrite(ptr, size, nmemb, stream);
     return written;
 }
 
+/**
+ * Callback function for libcurl to display a progress bar in the console.
+ */
 int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
     const int barWidth = 33;
     
@@ -61,6 +73,11 @@ int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_
     return 0;
 }
 
+/**
+ * Creates the directory structure for a given file path if it does not exist.
+ * @param filepath The full path to the file.
+ * @return True if successful, false otherwise.
+ */
 bool ensure_directory_exists(const std::string& filepath) {
     try {
         fs::path path(filepath);
@@ -80,6 +97,12 @@ bool ensure_directory_exists(const std::string& filepath) {
     return true;
 }
 
+/**
+ * Downloads a file from a URL to a local path.
+ * @param url Source URL.
+ * @param filepath Local destination path.
+ * @return True if download was successful.
+ */
 bool download_file(const std::string& url, const std::string& filepath) {
     CURL* curl;
     FILE* fp;

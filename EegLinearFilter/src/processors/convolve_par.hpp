@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 25.11.2025.
+//  Parallel convolution implementations using Grand Central Dispatch (GCD).
 //
 
 #ifndef CONVOLVE_PAR
@@ -13,6 +14,12 @@
 #include <arm_neon.h>
 #include <vector>
 
+/**
+ * Parallel naive implementation.
+ *
+ * @tparam Radius Kernel radius.
+ * @tparam ChunkSize Number of elements per GCD task.
+ */
 template <int Radius, int ChunkSize>
 void convolve_par_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();
@@ -36,6 +43,13 @@ void convolve_par_naive(const NeonVector& data, NeonVector& outputBuffer, const 
     });
 }
 
+/**
+ * Parallel implementation with vectorization explicitly disabled.
+ *
+ * @tparam Radius Kernel radius.
+ * @tparam ChunkSize Elements per task.
+ * @tparam KBatch Unrolling factor for the inner kernel loop.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -89,6 +103,13 @@ void convolve_par_no_vec(const NeonVector& data, NeonVector& outputBuffer, const
     });
 }
 
+/**
+ * Parallel implementation using compiler auto-vectorization hints.
+ *
+ * @tparam Radius Kernel radius.
+ * @tparam ChunkSize Elements per task.
+ * @tparam KBatch Unrolling factor.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;
@@ -142,6 +163,13 @@ void convolve_par_auto_vec(const NeonVector& data, NeonVector& outputBuffer, con
     });
 }
 
+/**
+ * Parallel implementation using manual ARM Neon Intrinsics.
+ *
+ * @tparam Radius Kernel radius.
+ * @tparam ChunkSize Elements per task.
+ * @tparam KBatch Unrolling factor.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 void convolve_par_manual_vec(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;

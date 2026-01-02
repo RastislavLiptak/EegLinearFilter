@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 01.12.2025.
+//  Implementation of the command-line user interface wizard for application configuration.
 //
 
 #include "io.hpp"
@@ -324,6 +325,10 @@ StepResult get_output_folder(AppConfig& config) {
     }
 }
 
+/**
+ * Orchestrates the CLI wizard to gather user configuration.
+ * @return Filled AppConfig structure.
+ */
 AppConfig read_user_input() {
     AppConfig config;
     print_legend();
@@ -378,6 +383,10 @@ AppConfig read_user_input() {
     return config;
 }
 
+/**
+ * Prompts the user to continue execution or exit.
+ * @return True if user wants to continue, false to exit.
+ */
 bool ask_to_continue() {
     std::string input_buffer;
     while (true) {

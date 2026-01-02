@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 26.11.2025.
+//  Header file for Metal GPU resources management and kernel execution dispatch.
 //
 
 #ifndef CONVOLVE_GPU_HPP
@@ -23,6 +24,11 @@
 #include <chrono>
 #include <string>
 
+/**
+ * Singleton structure managing the Metal device context.
+ * Holds the connection to the GPU (Device), the command submission queue,
+ * and pre-compiled pipeline states for the compute kernels.
+ */
 struct MetalContext {
     MTL::Device* device = nullptr;
     MTL::CommandQueue* commandQueue = nullptr;
@@ -48,6 +54,12 @@ struct MetalContext {
         library->release();
     }
     
+    /**
+     * Helper to compile a specific kernel function into a pipeline state.
+     * @param library The Metal library containing the shaders.
+     * @param functionNameStr The name of the kernel function in the .metal file.
+     * @return A pointer to the created ComputePipelineState.
+     */
     MTL::ComputePipelineState* createPipeline(MTL::Library* library, const char* functionNameStr) {
         NS::Error* error = nullptr;
         NS::String* functionName = NS::String::string(functionNameStr, NS::UTF8StringEncoding);
@@ -81,6 +93,16 @@ struct MetalContext {
     }
 };
 
+/**
+ * Dispatches the "Naive" GPU implementation.
+ * Sets up buffers, calculates grid dimensions based on simple tiling, and commits work to the GPU.
+ *
+ * @tparam Radius The kernel radius.
+ * @param data Input signal data.
+ * @param outputBuffer Destination buffer for results.
+ * @param convolutionKernel The 1D filter kernel weights.
+ * @return ProcessingStats containing total execution time and specific GPU compute time.
+ */
 template <int Radius>
 ProcessingStats convolve_gpu_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     auto start_wall = std::chrono::high_resolution_clock::now();
@@ -175,6 +197,17 @@ ProcessingStats convolve_gpu_naive(const NeonVector& data, NeonVector& outputBuf
     };
 }
 
+/**
+ * Dispatches the optimized "32-bit" GPU implementation.
+ * Sets up buffers, calculates grid dimensions based on tiling config, and commits work to the GPU.
+ *
+ * @tparam Radius The kernel radius.
+ * @param data Input signal.
+ * @param outputBuffer Destination buffer.
+ * @param convolutionKernel Filter kernel.
+ * @param useHalfPrecision (Unused/Reserved) Flag for potential FP16 optimization.
+ * @return ProcessingStats.
+ */
 template <int Radius>
 ProcessingStats convolve_gpu(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel, bool useHalfPrecision = false) {
     auto start_wall = std::chrono::high_resolution_clock::now();

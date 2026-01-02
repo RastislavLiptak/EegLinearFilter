@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 01.12.2025.
+//  Main configuration file containing settings for the entire application
 //
 
 #ifndef CONFIG_H

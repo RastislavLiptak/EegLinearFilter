@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 26.11.2025.
+//  Baseline 1D convolution Metal shader.
 //
 
 #include <metal_stdlib>
@@ -10,6 +11,18 @@
 
 using namespace metal;
 
+/**
+ * Naive compute kernel.
+ * * Strategy:
+ * 1. Each thread group cooperatively loads the required input data block (tile + halo) into shared memory.
+ * 2. Each thread calculates output for a specific set of pixels (4 pixels per thread) by iterating through the kernel.
+ * * @param data Input buffer.
+ * @param output Output buffer.
+ * @param convKernel Kernel weights buffer.
+ * @param kernelSize Radius-based kernel size.
+ * @param outSize Number of valid output elements.
+ * @param cache Shared threadgroup memory.
+ */
 kernel void convolve_kernel_naive(
     device const float4* data [[buffer(0)]],
     device float4* output [[buffer(1)]],
@@ -31,6 +44,7 @@ kernel void convolve_kernel_naive(
     threadgroup float4* cacheVec = (threadgroup float4*)cache;
     int startVectorIdx = groupStartPixel / 4;
 
+    // Load data into shared memory
     for (int i = tid; i < vectorsNeeded; i += THREADS_PER_GROUP) {
         int globalVecIdx = startVectorIdx + i;
         float4 vec = data[globalVecIdx];
@@ -43,6 +57,7 @@ kernel void convolve_kernel_naive(
     int globalOutputIndex = groupStartPixel + localPixelIndex;
     int globalOutputVecIndex = globalOutputIndex / 4;
 
+    // Compute convolution
     if (globalOutputIndex < (int)outSize) {
         float4 sum = float4(0.0f);
         
@@ -60,6 +75,7 @@ kernel void convolve_kernel_naive(
         if (globalOutputIndex + 3 < (int)outSize) {
              output[globalOutputVecIndex] = sum;
         } else {
+            // Handle edge case where output size is not multiple of 4
             device float* outScalar = (device float*)output;
             for (int i=0; i<4; ++i) {
                 if (globalOutputIndex + i < (int)outSize) {

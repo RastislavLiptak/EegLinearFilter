@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 19.11.2025.
+//  Core dispatch logic for selecting and executing specific processing strategies.
 //
 
 #ifndef PROCESSORS_HPP
@@ -14,6 +15,19 @@
 #include "convolve_gpu/convolve_gpu.hpp"
 #include <chrono>
 
+/**
+ * Executes a convolution processor based on the selected mode.
+ * Measures time taken for memory initialization and computation.
+ *
+ * @tparam Radius Kernel radius.
+ * @tparam ChunkSize Size of data chunks for processing.
+ * @tparam KBatch Unrolling batch size.
+ * @param mode Enum indicating which processor implementation to run (CPU/GPU, Seq/Par).
+ * @param inputData The raw input signal.
+ * @param outputBuffer The buffer to store processed results.
+ * @param convolutionKernel The filter kernel.
+ * @return ProcessingStats structure containing timing metrics.
+ */
 template <int Radius, int ChunkSize, int KBatch>
 ProcessingStats run_processor(const ProcessingMode mode, const NeonVector& inputData, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     auto mem_start = std::chrono::high_resolution_clock::now();

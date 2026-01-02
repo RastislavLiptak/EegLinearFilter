@@ -181,7 +181,6 @@ Zpracování dat probíhá v sekvenční pipeline navržené pro minimalizaci pa
     Pro uložení dat je definován vlastní typ \texttt{NeonVector}, který využívá zarovnání \texttt{aligned\_allocator} na 16384 bajtů.
     \begin{itemize}
         \item Toto zarovnání odpovídá velikosti paměťové stránky, což je nezbytná podmínka pro vytvoření tzv. \textit{zero-copy} bufferů v rámci rozhraní Metal API~\cite{apple_metal_nocopy}.
-        % TODO - ozdrojovat registry (16~B)
         \item Zároveň toto zarovnání automaticky splňuje požadavky na zarovnání pro CPU cache line (128~B~\cite{apple_silicon_addressing}) a SIMD registry (16~B), čímž je zajištěna minimalizace penalizací při přístupu do paměti.
     \end{itemize}
     

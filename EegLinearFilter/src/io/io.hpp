@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 18.11.2025.
+//  Header file declaring I/O functions for user input, file management, and data persistence.
 //
 
 #ifndef IO_HPP

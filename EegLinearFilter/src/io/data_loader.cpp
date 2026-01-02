@@ -3,6 +3,7 @@
 //  EegLinearFilter
 //
 //  Created by Rastislav Lipták on 18.11.2025.
+//  Implementation of EDF file loading, data conversion, and padding logic.
 //
 
 #include "io.hpp"
@@ -17,6 +18,7 @@
 #include <fstream>
 #include <cstring>
 
+// RAII wrapper to ensure EDF files are closed properly.
 struct EdfFileGuard {
     int handle;
 
@@ -32,6 +34,7 @@ struct EdfFileGuard {
     EdfFileGuard& operator=(const EdfFileGuard&) = delete;
 };
 
+// Helper to remove trailing whitespace from strings.
 std::string clean_string(const char* str) {
     std::string s(str);
     s.erase(s.find_last_not_of(" \n\r\t") + 1);
@@ -55,6 +58,15 @@ struct FileMetadata {
     size_t dataSize;
 };
 
+/**
+ * Loads an EDF file into memory.
+ * Reads metadata, converts raw digital values to physical float values,
+ * arranges data into a single continuous vector, and applies border padding.
+ *
+ * @param filePath Path to the .edf file.
+ * @param padding Number of elements to pad at the beginning and end of each signal.
+ * @return EdfData structure containing samples and header info.
+ */
 EdfData load_edf_data(const char* filePath, const int padding) {
     std::cout << "Loading file: " << filePath << "\n";
 
@@ -165,6 +177,7 @@ EdfData load_edf_data(const char* filePath, const int padding) {
 
     file.close();
 
+    // Apply border padding (replicate first/last value)
     for (int s = 0; s < hdr.edfsignals; ++s) {
         float* dataStart = &resultData.samples[static_cast<size_t>(s) * resultData.samplesPerSignalPadded + padding];
         
