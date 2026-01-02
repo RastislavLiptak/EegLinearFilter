@@ -953,6 +953,12 @@ Pro kvantifikaci efektivity paralelního zpracování byly na implementované al
     S = \frac{T_s}{T_p}, \quad e = \frac{\frac{1}{S} - \frac{1}{P}}{1 - \frac{1}{P}}, \quad S_{scaled} = P - (P-1)e
 \end{equation}
 
+Dále byl pomocí Amdahlova zákona odvozen teoretický limit maximálního zrychlení ($S_{limit}$) pro hypotetický nekonečný počet jader:
+
+\begin{equation}
+    \quad S_{limit} = \lim_{P \to \infty} \frac{1}{e + \frac{1-e}{P}} = \frac{1}{e}
+\end{equation}
+
 Pro přesné zhodnocení byly do těchto vztahů dosazeny časy čistého výpočtu ($T_{compute}$), které nezahrnují alokaci a nulování paměti. Tím je odfiltrována režie přípravy dat a izolována efektivita samotného konvolučního algoritmu včetně režie správy vláken. Výsledné hodnoty pro všechny implementační varianty shrnuje tabulka \ref{tab:parallel_metrics}.
 
 \begin{table}[ht]
@@ -960,22 +966,22 @@ Pro přesné zhodnocení byly do těchto vztahů dosazeny časy čistého výpo�
 \caption{Metriky paralelizace vypočtené z časů výpočtů ($P=8$)}
 \label{tab:parallel_metrics}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-\textbf{Implementace} & \textbf{$T_s$ [s]} & \textbf{$T_p$ [s]} & \textbf{Zrychlení ($S$)} & \textbf{Karp-Flatt ($e$)} & \textbf{Gustafson ($S_{scaled}$)} \\
+\textbf{Implementace} & \textbf{$T_s$ [s]} & \textbf{$T_p$ [s]} & \textbf{Zrychlení ($S$)} & \textbf{Karp-Flatt ($e$)} & \textbf{Gustafson ($S_{scaled}$)} & \textbf{Limit ($S_{limit}$)} \\
 \midrule
-\texttt{NAIVE}       & 42,24 & 5,92 & 7,14 & 0,017 (1,7 \%) & 7,88 \\
-\texttt{NO\_VEC}     & 17,11 & 2,87 & 5,96 & 0,049 (4,9 \%) & 7,66 \\
-\texttt{AUTO\_VEC}   & 10,17 & 1,70 & 5,98 & 0,048 (4,8 \%) & 7,66 \\
-\texttt{MANUAL\_VEC} & 10,27 & 1,69 & 6,07 & 0,045 (4,5 \%) & 7,68 \\
+\texttt{NAIVE}       & 42,24 & 5,92 & 7,14 & 0,017 (1,7 \%) & 7,88 & 58,8 \\
+\texttt{NO\_VEC}     & 17,11 & 2,87 & 5,96 & 0,049 (4,9 \%) & 7,66 & 20,4 \\
+\texttt{AUTO\_VEC}   & 10,17 & 1,70 & 5,98 & 0,048 (4,8 \%) & 7,66 & 20,8 \\
+\texttt{MANUAL\_VEC} & 10,27 & 1,69 & 6,07 & 0,045 (4,5 \%) & 7,68 & 22,2 \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-Nejvyšší hodnoty zrychlení ($S=7,13$) a nejnižší sériovou režii ($e=1,7\,\%$) vykazuje naivní implementace. Kvůli silné datové závislosti a nevyužívání registrů je výpočet limitován rychlostí samotného výpočtu, nikoliv propustností paměti. Jednotlivá vlákna tak nezahlcují sběrnici a nebrzdí se navzájem, což se blíží ideálnímu lineárnímu škálování podle Amdahlova zákona.
+Nejvyšší hodnoty zrychlení ($S=7,13$) a nejnižší sériovou režii ($e=1,7\,\%$) vykazuje naivní implementace. Kvůli silné datové závislosti a nevyužívání registrů je výpočet limitován rychlostí samotného výpočtu, nikoliv propustností paměti. Jednotlivá vlákna tak nezahlcují sběrnici a nebrzdí se navzájem, díky čemuž se tato verze blíží ideálnímu lineárnímu škálování.
 
-Naopak u optimalizovaných variant (\texttt{NO\_VEC}, \texttt{AUTO\_VEC} a \texttt{MANUAL\_VEC}) dochází k poklesu zrychlení na úroveň $S \approx 6,0$ a nárůstu sériové režie na cca $4,5\text{--}4,9\,\%$. Skutečnost, že tento limit postihuje i nevektorizovanou verzi (\texttt{NO\_VEC}), dokazuje, že již samotná algoritmická optimalizace zrychlila výpočet natolik, že 8 jader naráží na limit propustnosti paměťové sběrnice. Dalším důkazem tohoto tvrzení je vysoká hodnota Gustafsonova zákona ($S_{scaled} > 7,6$), která dokládá, že samotný algoritmus je navržen efektivně a úzkým hrdlem jsou výhradně sdílené hardwarové prostředky.
+Naopak u optimalizovaných variant (\texttt{NO\_VEC}, \texttt{AUTO\_VEC} a \texttt{MANUAL\_VEC}) dochází k poklesu zrychlení na úroveň $S \approx 6,0$ a nárůstu sériové režie na cca $4,5\text{--}4,9\,\%$. Tento jev ukazuje, že algoritmické optimalizace zkrátily dobu výpočtu natolik, že se úzkým hrdlem stala propustnost paměťové sběrnice a tak škálovatelnost s přidáváním dalších jader klesá rychleji než u naivní, výpočetně náročné implementace.
 %
 %
 %
