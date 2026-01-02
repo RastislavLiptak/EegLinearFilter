@@ -81,6 +81,7 @@ The project includes Python scripts to visualize the benchmark data.
       * `processors/`: Implementations of convolution algorithms (CPU & GPU).
       * `io/`: Input/Output handling (EDF loading, User input).
   * `lib/`: External libraries (`edflib`, `metal-cpp`, `magic_enum`).
+  * `doc/`: Project documentation.
 * `python/`: Analysis scripts.
 * `EegLinearFilter.xcodeproj`: Xcode project settings.
 
