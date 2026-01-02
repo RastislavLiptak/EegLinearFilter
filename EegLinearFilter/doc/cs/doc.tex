@@ -921,7 +921,7 @@ Základní naivní implementace (\texttt{CPU\_SEQ\_NAIVE}) dosahuje výkonu 21 G
 
 Při zapojení všech 8 jader škáluje výkon na 525 GFLOPS -- 529 GFLOPS. Teoretický limit celého CPU (multicore) se pohybuje v rozmezí 660--700 GFLOPS. Dosažená hodnota tedy odpovídá přibližně \textbf{75--80 \% teoretického maxima} celého čipu.
 
-Dalším důležitým ukazatelem je, že stabilita optimalizovaného sekvenčního i paralelního výpočtu je vysoká (viz obr. \ref{fig:cpu_par_auto_vec}). Rozptyl naměřených časů je minimální a pohybuje se v řádu desítek milisekund (odchylka pod 2 \%).
+Dalším důležitým ukazatelem je, že stabilita optimalizovaného sekvenčního i paralelního výpočtu je vysoká (viz obr. \ref{fig:cpu_par_auto_vec}). Rozptyl naměřených časů je minimální a pohybuje se v řádu desítek milisekund (odchylka pod 2,5 \%).
 
 \begin{figure}[ht]
     \centering
@@ -1124,7 +1124,7 @@ V této části se analyzuje vliv poloměru konvolučního jádra ($R$) na efekt
 
 \subsection{Charakteristika GPU škálování}
 
-Nejvýraznější nárůst výkonu je naměřený u implementace na grafickém akcelerátoru. Varianta \texttt{GPU\_32BIT} startuje na hodnotě $206$ GFLOPS ($R=2$) a stoupá až k hranici $2700$ GFLOPS ($R=256$), kde se již výkon drží na konzistentní úrovni. Tento rozdíl je způsoben tím, že u malých poloměrů je objem výpočtů příliš malý a doba exekuce příliš krátká na to, aby se dokázala efektivně zakrýt latence přístupů do globální paměti a hardwarová režie spojená se spouštěním vláken. S rostoucím poloměrem se ale poměr aritmetických operací vůči načítání dat zvyšuje, čímž dochází k plnému vytížení výpočetních jednotek a potlačení vlivu paměťové latence.
+Nejvýraznější nárůst výkonu je naměřený u implementace na grafickém akcelerátoru. Varianta \texttt{GPU\_32BIT} startuje na hodnotě $206$ GFLOPS ($R=2$) a stoupá až k hranici $2700$ GFLOPS ($R=256$), kde se již výkon drží na konzistentní úrovni. Tento rozdíl je způsoben tím, že u malých poloměrů je objem výpočtů příliš malý a doba exekuce příliš krátká na to, aby se dokázala efektivně zakrýt latenci přístupů do globální paměti a hardwarovou režii spojenou se spouštěním vláken. S rostoucím poloměrem se ale poměr aritmetických operací vůči načítání dat zvyšuje, čímž dochází k plnému vytížení výpočetních jednotek a potlačení vlivu paměťové latence.
 
 \subsection{Limity naivních algoritmů}
 
