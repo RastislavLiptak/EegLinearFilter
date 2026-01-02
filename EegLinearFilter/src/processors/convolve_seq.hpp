@@ -13,8 +13,6 @@
 #include <arm_neon.h>
 #include <vector>
 
-#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
-
 template <int Radius>
 void convolve_seq_apple(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     constexpr size_t KernelSize = 2 * Radius + 1;

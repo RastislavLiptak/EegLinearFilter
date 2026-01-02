@@ -1,0 +1,1311 @@
+% *****************************************************************************
+%
+%        FASThesis Manual
+%        (FASThesis Class File Documentation)
+%
+%        Faculty of Applied Sciences
+%        University of West Bohemia
+%
+%        Manual & Explanatory Document
+%        Copyright (c) 2022-2025 Kamil Ekštein, Dept. of Computer Science
+%        and Engineering, Faculty of Applied Sciences, UWB
+%
+%        Version:  0.98
+%		 Encoding: UTF-8
+%		 TeXer:    pdflatex
+%
+%        Last modification on 12-Feb-2025 by KE
+%
+% *****************************************************************************
+
+% _____________________________________________________________________________
+%
+%
+%	     DOCUMENT HEADER
+%
+% _____________________________________________________________________________
+%
+\documentclass[czech, sem, kiv, he, iso690alph, pdf, viewonly]{fasthesis}%
+\title{Filtrace EEG signálu lineární 1D konvolucí}
+\author{Rastislav}{Lipták}{Bc.}{}
+\signdate{31}{12}{2025}{V Plzni}
+\addbibresource{doc.bib}
+\nocopyrightnotice
+% _____________________________________________________________________________
+%
+%
+%	     DOCUMENT TEXT BEGINNING
+%
+% _____________________________________________________________________________
+%
+\begin{document}
+\frontpages[tm] % or notm if the `trademark' declaration is not needed
+\tableofcontents
+% 
+% -x---- ADDITIONAL COLOUR DEFINITIONS ----------------------------------------
+%
+\makeatletter%
+\ifx\FASThesis@style\c@fullcolor%
+	\definecolor{fascolor}{cmyk}{0.06, 0.27, 1.0, 0.12}%
+	\definecolor{fascolordk}{cmyk}{0.05, 0.28, 1.0, 0.24}%
+\else%
+	\definecolor{fascolor}{cmyk}{0, 0, 0, 0.6}%
+	\definecolor{fascolordk}{cmyk}{0, 0, 0, 0.75}%
+\fi%
+\makeatother%
+\lstdefinestyle{plainsrc}{
+	backgroundcolor=\color{fascolor!10},
+	basicstyle=\ttfamily\footnotesize,
+	numberstyle=\tiny\color{fascolordk},
+	numbers=left,
+	numbersep=5pt,
+	keepspaces=true,
+	tabsize=2,
+	extendedchars=true,
+	literate={á}{{\'a}}1 {č}{{\v{c}}}1 {ď}{{\v{d}}}1 {é}{{\'e}}1 {ě}{{\v{e}}}1 {è}{{\`{e}}}1 {í}{{\'{\i}}}1 {ľ}{{\v{l}}}1 {ň}{{\v{n}}}1 {ó}{{\'o}}1 {ŕ}{{\'r}}1 {ř}{{\v{r}}}1 {š}{{\v{s}}}1 {ť}{{\v{t}}}1 {ú}{{\'u}}1 {ů}{{\r{u}}}1 {ý}{{\'y}}1 {ž}{{\v{z}}}1
+	{Á}{{\'A}}1 {Č}{{\v{C}}}1 {Ď}{{\v{D}}}1 {É}{{\'E}}1 {Ě}{{\v{E}}}1 {È}{{\`{E}}}1 {Í}{{\'I}}1 {Ľ}{{\v{L}}}1 {Ň}{{\v{N}}}1 {Ó}{{\'O}}1 {Ŕ}{{\'R}}1 {Ř}{{\v{R}}}1 {Š}{{\v{S}}}1 {Ť}{{\v{T}}}1 {Ú}{{\'U}}1 {Ů}{{\r{U}}}1 {Ý}{{\'Y}}1 {Ž}{{\v{Z}}}1
+}
+% -x---- END OF ADDITIONAL COLOUR DEFINITIONS ---------------------------------
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Zadání}
+Cílem práce je realizace a optimalizace výpočtu lineární 1D konvoluce nad EEG daty.
+
+\vspace{1em}
+\noindent \textbf{Matematická definice:}
+Algoritmus realizuje diskrétní konvoluci vstupního signálu $x$ s konvolučním jádrem $h$ o poloměru $R$. Výstupní hodnota $y[i]$ je definována jako vážený součet prvků v okolí bodu $i$:
+
+\begin{equation}
+    y[i] = \sum_{j=-R}^{R} x[i+j] \cdot h[j]
+    \label{eq:convolution_def}
+\end{equation}
+
+\noindent Kde:
+\begin{itemize}
+    \item $x$ představuje vstupní diskrétní signál,
+    \item $h$ je symetrické konvoluční jádro o velikosti $2R+1$,
+    \item $R$ značí poloměr konvoluce.
+\end{itemize}
+
+\noindent \textbf{Požadavky na implementaci:}
+\begin{itemize}
+    \item \textbf{CPU varianta:} Vytvoření implementace, která efektivně kombinuje sekvenční zpracování, vícevláknové zpracování a SIMD vektorizaci.
+    \item \textbf{GPU varianta:} Realizujte výpočet na grafickém akcelerátoru.
+    \item \textbf{Referenční implementace:} Pro účely srovnání a ověření optimalizace bude zahrnuta i naivní (neoptimalizovaná) verze algoritmu.
+\end{itemize}
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Užitý hardware a software}
+
+Pro implementaci, experimentální část a měření výkonu byl využit počítač \product{Apple MacBook Pro 14 (2021)} osazený čipem (SoC) Apple M1 Pro. Tato kapitola shrnuje technické specifikace tohoto zařízení se zaměřením na parametry ovlivňující výpočetní výkon a popisuje softwarové prostředí, ve kterém probíhal překlad a běh aplikace.
+
+\section{Hardware}
+
+Čip Apple M1 Pro je založený na architektuře ARM (ISA \command{ARMv8.5-A}~\cite{dev_apple_silicon_isa}). Procesorová část (CPU) disponuje celkem 8~jádry, která jsou rozdělena do dvou clusterů dle architektury big.LITTLE:
+\begin{itemize}
+    \item \textbf{Výkonná jádra:} 6 jader s kódovým označením \term{Firestorm}. Tato jádra pracují na frekvenci 600 až 3228~MHz. Disponují 192~KB instrukční cache, 128~KB datové cache a sdílenou 24~MB L2 cache~\cite{nbc_cpu}. Mikroarchitektura Firestorm se vyznačuje šířkou pipeline 8~instrukcí na cyklus~\cite{dougallj_firestorm}. 
+    \item \textbf{Úsporná jádra:} 2 jádra s kódovým označením \term{Icestorm}, pracující na frekvenci 600 až 2064~MHz. Jsou vybavena menší 128~KB instrukční a 64~KB datovou cache a sdílenou 4~MB cache~\cite{nbc_cpu}.
+\end{itemize}
+
+Oba typy jader podporují vektorové instrukce technologie NEON a disponují 32~vektorovými registry o šířce 128~bitů~\cite{arm_arch_ref}. Paměťová hierarchie je dále rozšířena o systémovou cache (System Level Cache) o velikosti 24~MB~\cite{wiki_apple_m1}.
+
+Jelikož výrobce oficiální hodnoty výkonu ve FLOPS pro procesor neuvádí, je nutné je odvodit z parametrů mikroarchitektury. Výkonné jádro \term{Firestorm} dokáže zpracovat 32 operací s plovoucí řádovou čárkou za takt (díky čtveřici 128bitových NEON jednotek)~\cite{dougallj_firestorm}. Při maximální frekvenci 3,22~GHz lze teoretický výkon jednoho jádra vypočítat následovně:
+$$ 3,22 \text{ GHz} \times 32 \text{ FLOPs/cyklus} \approx 103 \text{ GFLOPS} $$
+
+V případě zapojení všech jader (multicore) se celkový teoretický výkon pohybuje v rozmezí 660 až 700~GFLOPS (součet výkonu šesti jader \term{Firestorm} a dvou úsporných jader \term{Icestorm}).
+
+Systém využívá jednotnou paměť (Unified Memory) typu LPDDR5-6400 o kapacitě 16~GB. Paměť je připojena přes 256bitovou sběrnici, což zajišťuje propustnost 200~GB/s~\cite{nbc_cpu}.
+
+Integrovaný grafický akcelerátor (GPU) obsahuje 14~aktivních jader, která celkově disponují 1792 aritmeticko-logickými jednotkami (ALU). GPU využívá SIMD architekturu se šířkou 32~vláken a má hardwarově omezenou sdílenou paměť (tzv. \command{threadgroup memory}) o velikosti 32~kB~\cite{apple_metal_tables}. Na základě analýzy třetí strany GPU dosahuje teoretického výpočetního výkonu v plovoucí řádové čárce (FP32) přibližně 4,6~TFLOPS~\cite{nbc_gpu}.
+
+Zařízení využívá aktivní systém chlazení.
+
+\section{Software}
+
+Vývoj, testování a měření probíhalo v prostředí operačního systému \product{macOS} (verze 26.1, 25B78). Jako vývojové prostředí (IDE) byl použit \product{Xcode} verze 26.2 (17C52).
+
+Projekt je implementován v jazyce \product{C++} (standard C++23) s využitím grafického API \product{Metal} (verze 4). Pro překlad kódu byly využity následující optimalizační parametry (flagy) kompilátoru, nastavené pro konfiguraci \textit{Release}:
+
+\begin{itemize}
+    \item \textbf{Obecné C++ flagy:}
+    \begin{code}{C++}{Kompilační flagy C++}
+-Rpass=loop-vectorize -Rpass-missed=loop-vectorize -O3 -ffast-math
+    \end{code}
+    \item \textbf{Metal compiler flagy:}
+    \begin{code}{C++}{Kompilační flagy Metal}
+-O3 -ffast-math
+    \end{code}
+\end{itemize}
+
+\noindent Aplikace využívá následující systémové frameworky a knihovny:
+\begin{itemize}
+    \item \texttt{Metal.framework}, \texttt{Accelerate.framework},
+    \item \texttt{Foundation.framework}, \texttt{CoreFoundation.framework},
+    \item \texttt{QuartzCore.framework}, \texttt{IOKit.framework},
+    \item \texttt{libcurl.tbd}.
+\end{itemize}
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Popis implementace}
+
+Struktura zdrojového kódu je navržena s ohledem na striktní oddělení vstupních a výstupních operací (modul \texttt{src/io}) a výpočetní logiky (\texttt{src/processors}). Architekturu doplňuje integrovaná knihovna \texttt{edflib} pro manipulaci se soubory EDF a pro komunikaci s grafickým akcelerátorem na platformě Apple Silicon je využitý C++ wrapper \texttt{metal-cpp}, umožňující přímé volání Metal API bez nutnosti Objective-C vrstvy.
+
+Zpracování dat probíhá v sekvenční pipeline navržené pro minimalizaci paměťové náročnosti. Celý proces zpracování dat, vizualizovaný na diagramu \ref{fig:controlflow}, se skládá ze čtyř na sebe navazujících fází:
+
+\begin{enumerate}
+    \item \textbf{Inicializace:} Na základě parametrů od uživatele se připraví konfigurační struktury. Následně se vygeneruje konvoluční jádro (Gaussova křivka), které je uloženo ve standardním \texttt{std::vector}.
+    
+    \item \textbf{Načtení dat:} Funkce \texttt{load\_edf\_data} zajistí načtení signálů a jejich konverzi na typ \texttt{float}. Data všech kanálů jsou ''zploštěna'' do jediného spojitého 1D vektoru. Tato struktura dat byla zvolena proto, že umožňuje procesoru i grafické kartě efektivněji rozdělovat práci na menší bloky bez nutnosti složité adresace vícerozměrných polí.
+    
+    Pro uložení dat je definován vlastní typ \texttt{NeonVector}, který využívá zarovnání \texttt{aligned\_allocator} na 16384 bajtů.
+    \begin{itemize}
+        \item Toto zarovnání odpovídá velikosti paměťové stránky, což je nezbytná podmínka pro vytvoření tzv. \textit{zero-copy} bufferů v rámci rozhraní Metal API~\cite{apple_metal_nocopy}.
+        % TODO - ozdrojovat registry (16~B)
+        \item Zároveň toto zarovnání automaticky splňuje požadavky na zarovnání pro CPU cache line (128~B~\cite{apple_silicon_addressing}) a SIMD registry (16~B), čímž je zajištěna minimalizace penalizací při přístupu do paměti.
+    \end{itemize}
+    
+    \item \textbf{Výpočetní jádro:} Funkce \texttt{run\_processor} řídí spouštění konkrétních implementací algoritmu. Aby se předešlo degradaci výkonu na sběrnici, pracuje se striktně se dvěma oddělenými buffery (vstupní \texttt{const} a výstupní). Při vývoji paralelních algoritmů se totiž ukázalo, že zápis a čtení do stejného paměťového bloku (in-place operace) vede k problému, kdy vlákna na různých jádrech si navzájem zneplatňovala cache lines, což zahltilo sběrnici synchronizační režií a výrazně zpomalilo výpočet.
+    
+    Specifikem GPU implementace je práce s pamětí:
+    \begin{itemize}
+        \item \textbf{Data signálu:} Díky použití \texttt{NeonVector} a SoC architektuře je možné využít techniku \textit{Zero-copy}.
+        \item \textbf{Konvoluční jádro:} Jelikož je jádro uloženo v běžném \texttt{std::vector} (bez specifického zarovnání), musí být do paměti GPU explicitně zkopírováno. Vzhledem k malé velikosti jádra (řádově kB) je však režie tohoto kopírování zanedbatelná.
+    \end{itemize}
+
+    \item \textbf{Export:} Po dokončení výpočtů funkce \texttt{save\_data} převede výsledky z linearizovaného vektoru zpět do struktury formátu EDF a uloží je na disk.
+\end{enumerate}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/controlflow_diagram.pdf}
+    \caption{Control Flow Diagram aplikace.}
+    \label{fig:controlflow}
+\end{figure}
+%
+%
+%
+\section{Referenční implementace}
+
+Pro ověření správnosti výstupů a srovnání výkonu byla implementována referenční verze využívající systémovou knihovnu \textbf{Accelerate framework} (modul vDSP). Tato knihovna je na platformě Apple Silicon implementována přímo nad instrukční sadou NEON (SIMD)~\cite{apple_accelerate_cpu}.
+
+Pro výpočet byla zvolena funkce \texttt{vDSP\_conv}, která realizuje klouzavý skalární součin~\cite{apple_vdsp_conv}. Z hlediska architektury aplikace je zásadní, že je tato funkce synchronní a neimplementuje interní paralelizaci.
+
+Matematicky funkce počítá korelaci mezi jádrem $A$ a signálem $B$:
+\begin{equation}
+    C[n] = \sum_{k=0}^{N-1} A[k] \cdot B[n+k]
+\end{equation}
+Díky symetrii použitého Gaussova jádra je tento výpočet ekvivalentní konvoluci bez nutnosti inverze vektoru filtru.
+%
+%
+%
+\section{Naivní implementace}
+
+Tato část popisuje prvotní funkční verze algoritmů pro CPU i GPU. Tyto implementace, označované jako „naivní“, představují doslovný přepis matematické definice konvoluce (rovnice \ref{eq:convolution_def}) do programového kódu.
+
+Hlavním účelem těchto verzí není dosažení maximálního výkonu, ale stanovení základní úrovně výkonu, vůči které je měřeno zrychlení (speedup) optimalizovaných implementací.
+
+V těchto implementacích není využita explicitní vektorizace či manuální rozbalování smyček. Optimalizace je ponechána čistě na schopnostech kompilátoru.
+
+\subsection{Implementace na CPU (Sekvenční a Paralelní)}
+
+Základem obou CPU variant je dvojitý vnořený cyklus. Vnější smyčka iteruje přes prvky signálu, zatímco vnitřní smyčka provádí skalární součin mezi částí vstupu a konvolučním jádrem.
+
+\begin{code}{C++}{Jádro naivní konvoluce na CPU\label{lst:cpu_naive}}
+for (size_t i = Radius; i < dataSize - Radius; ++i) {
+    float sum = 0.0f;
+    for (int j = -Radius; j <= Radius; ++j) {
+        sum += data[i + j] * convolutionKernel[j + Radius];
+    }
+    outputBuffer[i - Radius] = sum;
+}
+\end{code}
+
+Rozdíl mezi sekvenční a paralelní verzí spočívá v řízení toku výpočtu. Zatímco sekvenční verze iteruje přes data pomocí standardního cyklu \command"for", paralelní varianta deleguje tuto úlohu na systémové API \term{Grand Central Dispatch} (GCD). Konkrétně volání funkce \command"dispatch_apply" nahrazuje vnější smyčku a automaticky rozděluje výstupní pole na menší nezávislé bloky.
+
+Klíčovým parametrem optimalizace je velikost tohoto bloku. Cílem bylo nalézt nejmenší možnou granularitu pro ideální rozložení zátěže, u které se ještě neprojevuje režie správy vláken. Při testování menších bloků (2048 prvků) bylo naměřeno konzistentní zpomalení výpočtu, způsobené režií správy velkého množství úloh. Opačný extrém představovala hodnota 32768 prvků (typu \command"float"), jejíž paměťový nárok 128~kB přesně odpovídá celkové kapacitě L1 cache jader \term{Firestorm}. Zde docházelo k poklesu výkonu vlivem saturace cache, kdy nezbýval prostor pro konvoluční jádro a překrývající se vstupní data. V pásmu mezi těmito limity (konkrétně pro hodnoty 4096, 8192 a 16384) však měření vykazovala statisticky totožné výsledky. Jako finální parametr tak byla zvolena hodnota \command"ChunkSize = 8192", která leží uprostřed tohoto stabilního výkonnostního intervalu.
+
+Dalším parametrem ovlivňujícím výkon je priorita fronty GCD, která je nastavena na \command"QOS_CLASS_USER_INTERACTIVE". Tento příznak informuje plánovač operačního systému, že se jedná o úlohu vyžadující okamžitou odezvu, což na hybridní architektuře Apple Silicon vede k prioritnímu přidělování práce na výkonná jádra a zvyšování jejich taktu na maximální úroveň~\cite{apple_dispatch_qos, oakley_macos_qos}.
+
+\begin{code}{C++}{Ukázka paralelizace pomocí GCD\label{lst:gcd_snippet}}
+const size_t numChunks = (totalWork + ChunkSize - 1) / ChunkSize;
+dispatch_apply(numChunks, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^(size_t chunkIdx) {    
+    size_t chunkStart = start + chunkIdx * ChunkSize;
+    size_t chunkEnd = std::min(chunkStart + ChunkSize, end);
+
+    for (size_t i = chunkStart; i < chunkEnd; ++i) {
+         // ... výpočet konvoluce (stejný jako u sekvenční verze) ...
+    }
+});
+\end{code}
+
+\subsubsection*{Výkonnostní limity}
+Ačkoliv je tento kód funkční a snadno čitelný, trpí několika zásadními nedostatky, které brání plnému využití hardwaru Apple Silicon:
+
+\begin{enumerate}
+    \item \textbf{Silná datová závislost:} Výpočet využívá jediný akumulátor (\command"sum"), do kterého se v každé iteraci přičítá výsledek. To vytváří sériovou závislost, kdy procesor nemůže zahájit další krok výpočtu, dokud není dokončen ten předchozí. Vzhledem k tomu, že instrukce FMA (Fused Multiply-Add) má na architektuře \term{Firestorm} latenci 4 cykly, vznikají v pipeline procesoru prázdná místa a výpočetní jednotky nejsou plně vytíženy~\cite{dougallj_firestorm_simd}.
+
+    \item \textbf{Neefektivní práce s registry:} Při posunu konvolučního okna dochází k zahazování dat z registrů. Protože se okno posouvá vždy jen o jeden prvek, je drtivá většina vstupních hodnot z předchozího kroku potřebná i v tom aktuálním (dochází k výraznému překryvu dat). Jelikož však naivní implementace tato data v registrech neudrží, musí být v každé iteraci znovu načtena z L1 cache. I přes rychlost cache tento proces zbytečně brzdí výpočet.
+\end{enumerate}
+
+\subsection{Implementace na GPU}
+
+Přenos dat mezi CPU a GPU je optimalizován pro architekturu sdílené paměti. Díky tomu, že jsou vstupní data zarovnaná na potřebnou velikost paměťové stránky (využitím \command{NeonVector}), není nutné je fyzicky překopírovávat. Při vytváření bufferu na GPU tak nedochází k alokaci další paměti, ale API pouze převezme od procesoru ukazatel na paměťový blok vstupních dat a výstupního bufferu. Tento přístup (Zero-Copy) ovšem není použitý pro konvoluční jádro, které je paměťově zanedbatelné a jehož hodnoty se fyzicky překopírovávají~\cite{apple_metal_nocopy}.
+
+\begin{code}{C++}{Vytváření bufferů: Zero-Copy vs. standardní alokace\label{lst:gpu_buffers}}
+// Zero-Copy přenos vstupních dat
+MTL::Buffer* dataBuffer = ctx.device->newBuffer(
+    (void*)data.data(), 
+    data.size() * sizeof(float),
+    MTL::ResourceStorageModeShared, 
+    nullptr
+);
+
+// Standardní alokace s kopírováním dat pro konvoluční jádro
+MTL::Buffer* kernelBuffer = ctx.device->newBuffer(
+    convolutionKernel.data(),
+    convolutionKernel.size() * sizeof(float),
+    MTL::ResourceStorageModeShared
+);
+\end{code}
+
+\paragraph{Konfigurace dlaždic a vláken}
+Při samotném zpracování signálu pak dochází k rozdělení vstupních dat na menší nezávislé bloky zvané dlaždice (\term{Tiles}). Každá dlaždice představuje úsek dat, který je zpracován jednou skupinou vláken (\term{Threadgroup}). Velikost této dlaždice není náhodná, ale je určena součinem parametrů \command{THREADS_PER_GROUP} (počet výpočetních vláken ve skupině) a \command{ITEMS_PER_THREAD} (počtem vzorků signálu, které zpracuje jedno vlákno).
+
+\begin{equation}\label{eq:tile_size}
+    \text{TILE\_SIZE} = \text{THREADS\_PER\_GROUP} \times \text{ITEMS\_PER\_THREAD}
+\end{equation}
+
+Pro implementaci byla zvolena konfigurace \command{THREADS_PER_GROUP = 256}. Tato hodnota je násobkem hardwarové šířky SIMD jednotky (32 vláken), což zajišťuje plné vytížení výpočetních cyklů. Současně objem dat, který musí takto velká skupina načíst, bezpečně nepřekračuje limit 32~kB vyhrazený pro sdílenou paměť. Ačkoliv experimentální měření s hodnotami 128, 512 a 1024 ukázala, že výkon této verze je limitován spíše paměťovou propustností než nastavením paralelizace, byla hodnota 256 zachována pro konzistenci s navazující optimalizovanou implementací.
+
+Druhým parametrem je konfigurace \command{ITEMS_PER_THREAD = 4}, která byla zvolena s ohledem na využití datového typu \command{float4}. Ten umožňuje efektivně zpracovávat čtyři vzorky signálu v jediném kroku, což se promítá do celé struktury výpočetního kernelu. 
+
+\paragraph{Výpočet v rámci kernelu}
+Výpočet v rámci jednoho kernelu začíná fází kooperativního načítání, kdy skupina vláken společně přenese přidělenou dlaždici z globální paměti do rychlé lokální paměti (\term{threadgroup memory}). Vlákna načítají data po vektorech o 4 vzorcích a naplní cache nejen daty pro výpočet, ale i nezbytnými okraji. 
+
+\begin{code}{C++}{Kooperativní načtení dat do sdílené paměti\label{lst:gpu_load_phase}}
+int groupStartPixel = group_id * (THREADS_PER_GROUP * 4);
+int startVectorIdx = groupStartPixel / 4;
+int totalPixels = (THREADS_PER_GROUP * 4) + kSize - 1;
+int vectorsNeeded = (totalPixels + 3) / 4;
+threadgroup float4* cacheVec = (threadgroup float4*)cache;
+
+for (int i = tid; i < vectorsNeeded; i += THREADS_PER_GROUP) {
+    int globalVecIdx = startVectorIdx + i;
+    cacheVec[i] = data[globalVecIdx];
+}
+\end{code}
+
+Po synchronizaci bariérou následuje výpočetní smyčka, kde již každé vlákno pracuje samostatně: čte připravená data z lokální paměti, provádí aritmetické operace nad čtveřicemi hodnot a výsledný vektor zapisuje zpět.
+
+\begin{code}{C++}{Naivní vektorizovaný výpočet na GPU\label{lst:gpu_compute_phase}}
+threadgroup_barrier(mem_flags::mem_threadgroup);
+
+int localPixelIndex = tid * 4; 
+float4 sum = float4(0.0f);
+
+for (int k = 0; k < kSize; ++k) {
+    float d0 = cache[localPixelIndex + k + 0];
+    float d1 = cache[localPixelIndex + k + 1];
+    float d2 = cache[localPixelIndex + k + 2];
+    float d3 = cache[localPixelIndex + k + 3];
+    
+    sum = fma(float4(d0, d1, d2, d3), float4(convKernel[k]), sum);
+}
+
+int globalOutputVecIndex = (groupStartPixel + localPixelIndex) / 4;
+output[globalOutputVecIndex] = sum;
+\end{code}
+
+\subsubsection*{Výkonnostní limity}
+V rámci této implementace byly nasazeny některé optimalizační techniky, jako je Zero-Copy přenos dat a práce s vektorovými typy. Přesto naráží na výkonnostní limity způsobené samotnou architekturou kódu:
+
+\begin{enumerate}
+    \item \textbf{Silná datová závislost:} Závislost na jediném akumulátoru \command{sum} vynucuje striktně sériové zpracování v rámci jednoho výpočetního kernelu. Další instrukce FMA nemůže začít před dokončením předchozí, což vede k nevyužitým cyklům (pipeline stalls). Jelikož vlákno nemá žádnou jinou nezávislou práci, nelze tyto prostoje skrýt na úrovni instrukčního paralelismu.
+    
+    \item \textbf{Redundantní čtení a nízká aritmetická intenzita:} Limitujícím faktorem je nutnost opakovaného načítání čtyř skalárních hodnot (vstupního vektoru) uložených ve sdílené paměti. Protože implementace neudrží data v registrech mezi iteracemi, musí být při posunu konvolučního okna načítána znovu, ačkoliv se většina hodnot překrývá. To vede k extrémnímu nepoměru: na jednu výpočetní instrukci (FMA) připadá pět čtení z paměti (4x sestavení vektoru + 1x koeficient). Výpočetní jednotky tak většinu času pouze čekají na data.
+
+    \item \textbf{Limit velikosti konvolučního jádra:} Tato implementace omezuje maximální délku konvolučního jádra, kterou program dokáže zpracovat. Pokud totiž bude jádro příliš velké dojde k pádu výpočtu, způsobeném nutností načíst do limitované sdílené paměti (32~kB) nejen zpracovávanou dlaždici, ale i kompletní okolí definované poloměrem jádra. Zatímco vstupní signál je efektivně rozdělen na bloky, paměťový nárok na toto okolí roste s velikostí jádra a v určitém bodě kapacitu paměti vyčerpá. Je však nutné podotknout, že tento limit se pohybuje v řádech tisíců vzorků. V kontextu zpracování EEG signálu, kde se typicky využívají kratší filtry, tak toto omezení nepředstavuje pro běžné úlohy reálnou překážku.
+\end{enumerate}
+%
+%
+%
+\section{Optimalizovaná CPU implementace}
+
+Optimalizace CPU implementace byla primárně cílena na konvoluci s většími jádry (řádově desítky až stovky prvků). Ačkoliv se v praxi často využívají i velmi malá jádra (např. 3--7 prvků~\cite{tang2020omni}), přínos pokročilých optimalizačních technik (jako je vektorizace či manuální rozbalování smyček) se nejlépe demonstruje na úlohách s vyšší aritmetickou náročností. Právě v těchto případech, kdy výpočet není limitován propustností paměti, lze efektivně maximalizovat využití výpočetních jednotek architektury \term{Apple Silicon}.
+
+Z hlediska řízení toku výpočtu vycházejí tyto optimalizované implementace přímo z logiky naivní verze, přičemž schéma paralelizace zůstalo nezměněno. To znamená, že sekvenční verze využívá pro iteraci nad daty standardní cyklus \command"for", zatímco paralelní varianta deleguje rozdělení práce na systémové API \term{Grand Central Dispatch} (GCD). Volání \command"dispatch_apply" je zde opět realizováno s prioritou \command"QOS_CLASS_USER_INTERACTIVE". Stejně tak zůstala zachována strategie dělení dat do nezávislých bloků o velikosti definované konstantou \command"CHUNK_SIZE" (8192 prvků), která se stejně jako u naivní implementace osvědčila jako ideální kompromis mezi granularitou paralelizace a režií správy vláken.
+
+\subsection{Skalární a autovektorizovaná implementace}
+
+Skalární i autovektorizovaná varianta sdílejí totožný zdrojový kód a liší se výhradně instrukcemi pro kompilátor \term{Clang}, což umožňuje přímo porovnat přínos vektorizace oproti čistě skalárnímu zpracování. Rozdíl spočívá v konfiguraci direktivy \command"#pragma clang loop vectorize". Zatímco u skalární verze je vektorizace explicitně zakázána parametrem \command"disable", u autovektorizované verze je naopak povolena parametrem \command"enable" s nápovědou pro prokládání \command"interleave_count(4)". Absence automatické vektorizace u verze bez explicitních direktiv byla ověřena během překladu pomocí diagnostických flagů \command"-Rpass=loop-vectorize" (vypíše informace o smyčkách, které kompilátor vektorizoval) a \command"-Rpass-missed=loop-vectorize" (vypíše informace o smyčkách, kde kompilátor vektorizaci zvažoval, ale neprovedl ji). Tuto skutečnost potvrdil i experiment, kdy kompilace kódu s globálně zakázanou vektorizací vedla k identickému výkonu.
+
+\subsubsection*{Algoritmické optimalizace}
+
+Provedené optimalizace se přímo zaměřují na výkonnostní problémy naivní implementace. Primárním cílem je rozbití silných datových závislostí, maximalizace vytížení instrukční pipeline a optimalizace správy registrů pro minimalizaci redundantních přístupů do paměti. K dosažení těchto cílů byly provedeny následující úpravy:
+
+\paragraph{Změna pořadí smyček}
+Tato technika nejvýrazněji ovlivnila výkon optimalizované implementace. Zatímco v naivní verzi vnější smyčka prochází data a vnitřní smyčka konvoluční jádro, v optimalizované verzi jsou smyčky otočené, tedy vnější smyčka iteruje přes prvky konvolučního jádra a vnitřní přes vstupní data. Prakticky to znamená, že v naivní implementaci je vnější smyčka „velká“ (iteruje přes data) a vnitřní smyčka „malá“ (iteruje přes jádro). Kvůli tomu, že je vnitřní cyklus krátký, dochází k velmi rychlé obměně hodnot v registrech. Naopak v optimalizované verzi je vnější smyčka malá a vnitřní velká. Díky tomu platí, že jakmile vnější smyčka načte hodnotu koeficientu do registru, provede se s ní velké množství výpočtů (průchod celým blokem dat), než je vyměněna za jinou. Tím se drasticky snižuje frekvence komunikace mezi pamětí L1 a registry, která v původní verzi brzdila výpočet
+
+\paragraph{Blokové zpracování jádra}
+Zavedení blokového zpracování bylo nutným krokem pro stabilizaci výkonu u velkých konvolučních jader. Ačkoliv změna pořadí smyček optimalizovala toky dat, při testování velkých poloměrů jader (např. R=512 a více) docházelo k výrazným propadům výkonu. Analýza ukázala, že nejpravděpodobnější příčinou je způsob, jakým se kompilátor snaží distribuovat data mezi RAM, cache a registry. Aby byl výpočet efektivní, pravděpodobně se kompilátor snaží udržet průběžné součety v registrech, avšak pokud je konvoluční jádro příliš velké, všechna data se už do registrů nevejdou a dojde k přetečení, kvůli kterému je kompilátor nucen využít pomalejší L1 cache
+
+Funkčním řešením problému s padajícím výkonem se ukázalo rozdělení jádra na fixní bloky o velikosti \command{K_BATCH = 32}. Tato hodnota byla zvolena na základě experimentů, kdy jak vyšší, tak nižší hodnoty vykazovaly horší výkon.
+
+\begin{code}{C++}{Struktura blokového zpracování}
+float* __restrict o_chunk = outputPtr + start;
+const float* __restrict d_chunk = dataPtr + start;
+
+size_t k = 0;
+// Vnější smyčka iteruje přes jádro po blocích (KBatch)
+for (; k + KBatch <= KernelSize; k += KBatch) {
+
+    // Načtení bloku jádra do lokálního bufferu (registry)
+    float k_vals[KBatch];
+    for(int i=0; i<KBatch; ++i) k_vals[i] = kernelPtr[k+i];
+
+    // Vnitřní smyčka iteruje přes data (Output Stationary)
+    #pragma clang loop vectorize(enable) interleave_count(4)
+    for (size_t out = 0; out < actualChunkSize; ++out) {
+         // ... výpočet konvoluce ...
+    }
+}
+\end{code}
+
+\paragraph{Nezávislost instrukcí a manuální rozbalení smyčky}
+Pro zajištění nezávislosti instrukcí a maximální vytížení pipeline využívá výpočet \textbf{čtveřici} nezávislých akumulátorů (\command"acc0" až \command"acc3"). Tento počet byl zvolen s ohledem na latenci instrukce FMA (\term{Fused Multiply-Add}), která na procesorech \term{Firestorm} trvá \textbf{4 cykly}~\cite{dougallj_firestorm_simd}. Rozdělení práce mezi více sčítačů umožňuje efektivní překrytí této latence, kdy pipeline může začít zpracovávat instrukci pro \command"acc1", zatímco výpočet \command"acc0" stále probíhá. 
+
+Stejný faktor je využit i pro manuální rozbalení smyčky. Krok smyčky tak přesně koresponduje s kapacitou 128bitového registru \term{NEON}, který pojme právě čtyři hodnoty typu \command"float". Díky tomu může kompilátor snadno nahradit skupinu skalárních operací jedinou vektorovou instrukcí.
+
+\begin{code}{C++}{Vnitřní smyčka s unrollingem}
+float* __restrict o_chunk = outputPtr + start;
+
+for (size_t out = 0; out < actualChunkSize; ++out) {
+    float acc0 = 0.0f;
+    float acc1 = 0.0f;
+    float acc2 = 0.0f;
+    float acc3 = 0.0f;
+    
+    const float* __restrict current_d = d_chunk + out + k;
+
+    for (int i = 0; i < KBatch; i += 4) {
+        acc0 += current_d[i + 0] * k_vals[i + 0];
+        acc1 += current_d[i + 1] * k_vals[i + 1];
+        acc2 += current_d[i + 2] * k_vals[i + 2];
+        acc3 += current_d[i + 3] * k_vals[i + 3];
+    }
+    
+    o_chunk[out] += (acc0 + acc1 + acc2 + acc3);
+}
+\end{code}
+
+\paragraph{Prokládání iterací}
+Direktiva \command"#pragma clang loop interleave_count(4)" instruuje kompilátor, aby zpracovával 4 iterace smyčky současně. Volba faktoru 4 je přímo svázána s dostupným počtem hardwarových registrů. Pro výpočet jednoho bodu se používají 4 nezávislé akumulátory. Při \textbf{prokládání} 4 iterací tak procesor musí udržovat v běhu celkem $4 \times 4 = 16$ akumulátorů současně. Vzhledem k tomu, že architektura \term{NEON} disponuje celkem 32 registry, je tato hodnota optimální. Polovina registrů (16) je využita pro udržení stavu paralelních výpočtů a druhá polovina zůstává k dispozici pro načítání koeficientů jádra (\command"k_vals") a vstupních dat. Například faktor prokládání 6 by již vedl k požadavku na 24 registrů pouze pro akumulátory, což by ponechalo kriticky málo prostoru pro operandy. To by nutilo kompilátor odkládat data do paměti a degradovalo výkon, což potvrdila i experimentální měření.
+
+\begin{code}{C++}{Prokládání iterací na CPU}
+size_t k = 0;
+for (; k + KBatch <= KernelSize; k += KBatch) {
+    // ...
+    #pragma clang loop vectorize(enable) interleave_count(4)
+    for (size_t out = 0; out < actualChunkSize; ++out) {
+        // ...
+        for (int i = 0; i < KBatch; i += 4) {
+            acc0 += current_d[i + 0] * k_vals[i + 0];
+            // ...
+            acc3 += current_d[i + 3] * k_vals[i + 3];
+        }
+    }
+}
+\end{code}
+%
+%
+%
+\subsection{Manuálně vektorizovaná implementace}
+
+Cílem této implementace je pomocí vstavěných funkcí pro sadu instrukcí \term{NEON} co nejpřesněji reprodukovat optimalizační strategii, kterou aplikuje kompilátor u automaticky vektorizované varianty. Kód je strukturován tak, aby explicitně realizoval stejné principy práce s registry, k jakým dochází při automatickém překladu.
+
+Logika výpočtu proto kopíruje prokládání iterací a rozbalení smyčky v identickém rozsahu. Vnitřní smyčka zpracovává 16 výstupních prvků současně, rozdělených do čtyř nezávislých skupin (vektory A, B, C, D). Pro každou skupinu je aplikován unrolling s krokem 4, což odpovídá matici $4 \times 4$ vektorových akumulátorů:
+
+\begin{itemize}
+    \item \textbf{Vektory A (out $0\dots3$):} registry \command{acc0_A} až \command{acc3_A}
+    \item \textbf{Vektory B (out $4\dots7$):} registry \command{acc0_B} až \command{acc3_B}
+    \item \textbf{Vektory C (out $8\dots11$):} registry \command{acc0_C} až \command{acc3_C}
+    \item \textbf{Vektory D (out $12\dots15$):} registry \command{acc0_D} až \command{acc3_D}
+\end{itemize}
+
+Tato konfigurace, stejně jako automatická verze, vyhrazuje 16 vektorových registrů pro mezivýsledky. Zbývajících 16 registrů architektury \term{Apple Silicon} pak slouží pro vstupní hodnoty, konkrétně čtyři registry uchovávají koeficienty jádra a zbytek je využit pro načítání datových bloků pro skupiny A až D.
+
+Pro realizaci samotné vektorizace je nutné použít instrukce \command{vld1q_f32} (načtení bloku dat z paměti do registru), \command{vmulq_f32} (vektorové násobení), \command{vfmaq_f32} (vektorové násobení s přičtením k akumulátoru), \command{vaddq_f32} (sčítání dvou vektorů) a \command{vst1q_f32} (uložení výsledného vektoru zpět do paměti)~\cite{arm_neon_intrinsics}. Protože se však prvky konvolučního jádra v cyklu vybírají po jednom (jsou to skaláry), musí být nejprve použita funkce \command{vdupq_n_f32}, která tuto jednu hodnotu replikuje do všech pozic pomocného vektoru $[k, k, k, k]$. Díky tomu může následně instrukce FMA zpracovat vektor vstupních dat a v jediném instrukčním cyklu spočítat 4 hodnoty najednou, jak je ukázáno na schématu~\ref{eq:simd_broadcast_mul}.
+
+\begin{equation}
+\label{eq:simd_broadcast_mul}
+\underbrace{\begin{bmatrix} d_0 \\ d_1 \\ d_2 \\ d_3 \end{bmatrix}}_{\text{Vstupní data}}
+\times
+\underbrace{\begin{bmatrix} k \\ k \\ k \\ k \end{bmatrix}}_{\text{Replikovaný koeficient}}
+=
+\underbrace{\begin{bmatrix} d_0 \cdot k \\ d_1 \cdot k \\ d_2 \cdot k \\ d_3 \cdot k \end{bmatrix}}_{\text{Vektorový výsledek}}
+\end{equation}
+
+\begin{code}{C++}{Manuální vektorizace pomocí vstavěných funkcí}
+for (int i = 0; i < KBatch; i += 4) {
+    // Replikace koeficientu na všechny pozice vektoru (např. [k0, k0, k0, k0])
+    float32x4_t k0 = vdupq_n_f32(k_ptr_base[i + 0]);
+    // ... k1, k2, k3
+
+    // Výpočet FMA pro skupinu A (registry acc0_A až acc3_A)
+    acc0_A = vfmaq_f32(acc0_A, vld1q_f32(current_d + i + 0), k0);
+    acc1_A = vfmaq_f32(acc1_A, vld1q_f32(current_d + i + 1), k1);
+    // ... acc2_A, acc3_A
+
+    // ... Identicky pro skupiny B, C a D (posunuté v datech) ...
+}
+
+// Sečtení 4 dílčích vektorů a přičtení výsledku k celkovému výsledku
+float32x4_t sum_A = vaddq_f32(vaddq_f32(acc0_A, acc1_A), vaddq_f32(acc2_A, acc3_A));
+vst1q_f32(o_chunk + out, vaddq_f32(vld1q_f32(o_chunk + out), sum_A));
+\end{code}
+
+Vzhledem k fixní velikosti bloku (16 prvků) obsahuje kód dvě úrovně „dočišťovacích“ smyček (vektorovou po 4 prvcích a skalární), které řeší okrajové případy nedělitelné velikostí bloku.
+%
+%
+%
+\section{Optimalizovaná GPU implementace}
+
+Hlavním cílem optimalizované implementace bylo maximalizovat využití výpočetního výkonu grafického akcelerátoru a překonat limity paměťové propustnosti, které byly úzkým hrdlem naivní verze. Součástí optimalizačního procesu bylo i odstranění omezení pro maximální velikost konvolučního jádra.
+
+Jelikož tato verze vychází z naivní implementace, sdílí s ní klíčové prvky jako přenos vstupních dat a výstupního bufferu pomocí \textit{Zero-Copy} přístupu a konfiguraci vláken, tedy jak moc je úloha rozdělená na pracovní skupiny (\command{ITEMS_PER_THREAD} a \command{THREADS_PER_GROUP}) a jaká je velikost jedné dlaždice (\command{TILE_SIZE}).
+
+Zásadní změny se odehrály v logice výpočetního kernelu (shaderu), který byl kompletně přepracován s cílem maximalizovat aritmetickou intenzitu a eliminovat redundantní přístupy do paměti. K dosažení těchto vlastností byly implementovány tyto změny:
+
+\paragraph{Zvýšení granularity vlákna}
+Prvním krokem k vyššímu výkonu bylo radikální zvýšení objemu práce, kterou vykonává jedno vlákno. Oproti naivní verzi, kde vlákno zpracovává pouze jeden vektor (4 hodnoty), optimalizovaná verze počítá konvoluci pro \textbf{16 hodnot současně}. To je v kódu realizováno pomocí čtyř nezávislých akumulátorů typu \texttt{float4} (\texttt{sumA}, \texttt{sumB}, \texttt{sumC}, \texttt{sumD}). Tento počet byl zvolen na základě experimentálního ověření. Testované konfigurace se 3 a 5 akumulátory vykazovaly konzistentně horší výkon než varianta se čtyřmi.
+
+\paragraph{Posuvné okno v registrech}
+Implementace posuvného okna v registrech představuje optimalizaci s nejvýznamnějším dopadem na výsledný výkon kernelu. Zatímco naivní verze byla limitována propustností paměti kvůli opakovanému načítání stejných dat, optimalizovaná verze radikálně mění přístup zavedením privátní cache přímo v registrech vlákna.
+
+Implementace využívá 16 skalárních registrů (\texttt{v0} až \texttt{v15}), které tvoří posuvné okno nad vstupními daty. Před vstupem do hlavní smyčky se tyto registry naplní prvními 16 hodnotami ze sdílené paměti. V každém kroku se pak provede konvoluční součin mezi daty uloženými v registrech a příslušnou vahou konvolučního jádra, přičemž výsledky se sčítají do výstupních akumulátorů. Jakmile je výpočet pro daný krok hotov, okno se posune, což znamená, že se hodnota v nejstarším registru \texttt{v0} zahodí a obsah ostatních registrů se přesune o jednu pozici vlevo (\texttt{v1} $\rightarrow$ \texttt{v0}, \texttt{v2} $\rightarrow$ \texttt{v1} atd.). Tím se uvolní poslední registr \texttt{v15}, do kterého se načte \textbf{jediná} nová hodnota ze sdílené paměti.
+
+\begin{code}{C++}{Princip posuvného okna v hlavní smyčce\label{lst:gpu_sliding_window}}
+float v0 = scalarCache[localBaseIndex + 0];
+float v1 = scalarCache[localBaseIndex + 1];
+// ...
+float v15 = scalarCache[localBaseIndex + 15];
+
+for (int k = 0; k < kernelSize; ++k) {
+    float w = convKernel[k];
+    sumA = fma(float4(v0, v1, v2, v3),     float4(w), sumA);
+    sumB = fma(float4(v4, v5, v6, v7),     float4(w), sumB);
+    sumC = fma(float4(v8, v9, v10, v11),   float4(w), sumC);
+    sumD = fma(float4(v12, v13, v14, v15), float4(w), sumD);
+    
+    float next = scalarCache[localBaseIndex + k + 16];
+
+    v0 = v1;  v1 = v2;  v2 = v3;  v3 = v4;
+    v4 = v5;  v5 = v6;  v6 = v7;  v7 = v8;
+    v8 = v9;  v9 = v10; v10 = v11; v11 = v12;
+    v12 = v13; v13 = v14; v14 = v15; v15 = next;
+}
+\end{code}
+
+Díky tomu, že se data do registrů opakovaně nenačítají, ale pouze se v nich přesouvají, dosahuje tato metoda výrazně vyšší aritmetické intenzity než naivní implementace. Zatímco u naivní verze vyžadovala každá instrukce FMA samostatný přístup do sdílené paměti (poměr 1 čtení : 1 FMA), v optimalizované verzi připadá na \textbf{jedno čtení} celkem \textbf{16 instrukcí FMA}. Úzké hrdlo výpočtu se tak přesouvá z paměťové sběrnice na aritmetické jednotky GPU.
+
+\paragraph{Segmentace konvolučního jádra}
+Aby bylo možné zpracovávat konvoluční filtry libovolné délky a nedocházelo k vyčerpání limitované kapacity sdílené paměti (32~kB na skupinu vláken), byl do optimalizované verze zaveden princip segmentace konvolučního jádra. Vnější smyčka kernelu tak nejde přes celé jádro najednou, ale iteruje po blocích o fixní velikosti \command{KERNEL_SEGMENT_SIZE}.
+
+Velikost tohoto bloku nelze volit náhodně. Musí být nastavena v přímé závislosti na počtu vláken ve skupině (\command{THREADS_PER_GROUP}) tak, aby celkový objem dat potřebný pro jednu iteraci výpočtu nepřekročil hardwarový limit paměti. Celková paměťová náročnost je dána vztahem~\ref{eq:required_mem_thread_gpu}.
+
+\begin{equation}
+    \label{eq:required_mem_thread_gpu}
+    M_{req} \approx (\command{TILE_SIZE} + \command{KERNEL_SEGMENT_SIZE}) \times \command{sizeof(float)}
+\end{equation}
+
+Pro implementaci byla zvolena konfigurace \command{KERNEL_SEGMENT_SIZE = 1024} a \command{THREADS_PER_GROUP = 256}. Vzhledem k tomu, že velikost \command{TILE_SIZE} je dána rovnicí \ref{eq:tile_size} (kde \command{ITEMS_PER_THREAD} = 16), je hodnota 256 nejvyšší možnou, protože 512 vláken by obsadilo celou dostupnou kapacitu sdílené paměti. Jedinou proměnnou, kterou tak lze ovlivnit, je \command{KERNEL_SEGMENT_SIZE}, u které se experimentálně ověřilo, že při jejím zvýšení na 2048 a 4096 i snížení na 512 dochází k poklesu výkonu.
+
+V každé fázi smyčky se tak do sdílené paměti načte pouze nezbytný úsek vstupních dat a provede se výpočet. Před přechodem na další segment je ale nutná synchronizace bariérou (\command{threadgroup_barrier}). Bez ní by rychlejší vlákna začala do sdílené cache načítat data pro nový segment a přepsala by obsah sdílené paměti dříve, než by ji pomalejší vlákna stihla využít pro výpočet aktuálního segmentu.
+
+\begin{code}{C++}{Implementace segmentovaného zpracování konvoluce\label{lst:gpu_segmentation_loop}}
+for (int k_base = 0; k_base < (int)kernelSize; k_base += KERNEL_SEGMENT_SIZE) {
+    // Určení délky aktuálního segmentu (buď plný segment, nebo zbytek)
+    int currentSegmentLen = min((int)KERNEL_SEGMENT_SIZE, (int)kernelSize - k_base);
+
+    // Výpočet potřebného množství dat
+    int elementsNeeded = TILE_SIZE + currentSegmentLen - 1;
+    int vectorsNeeded = (elementsNeeded + 3) / 4;
+    int dataOffset = groupStartGlobal + k_base;
+
+    // ... Kooperativní načítání dat do sdílené paměti ...
+
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    // ... Vlastní výpočet nad aktuálním segmentem ...
+
+}
+\end{code}
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Uživatelské rozhraní a ovládání}
+
+Program je navržen jako konzolová aplikace (CLI). Interakce s uživatelem probíhá formou textového průvodce, který postupně konfiguruje parametry pro zpracování EEG signálu.
+
+\section{Konfigurace a vstupy}
+
+Po spuštění aplikace je uživatel vyzván k zadání série konfiguračních parametrů. Ovládání se řídí následujícími pravidly:
+
+\begin{itemize}
+    \item \textbf{Potvrzení volby:} Pro potvrzení zadané hodnoty nebo pro výběr výchozí (defaultní) hodnoty slouží klávesa \hotkey{Enter}. Výchozí hodnoty jsou vždy uvedeny v závorce u příslušné výzvy.
+    \item \textbf{Návrat zpět:} Pokud uživatel udělá chybu nebo chce změnit předchozí volbu, může zadat znak \hotkey{b} (back), čímž se vrátí o krok zpět v konfiguračním procesu.
+    \item \textbf{Validace vstupů:} Vstupy jsou automaticky kontrolovány. U číselných voleb (např. výběr módu) se kontroluje rozsah povolených hodnot. Při zadávání cesty k výstupnímu souboru aplikace ověří, zda se jedná o validní cestu ke složce. Pokud složka neexistuje, program se ji pokusí vytvořit.
+\end{itemize}
+
+Aplikace umožňuje konfigurovat následující parametry běhu:
+\begin{enumerate}
+    \item \textbf{Vstupní dataset:} Cesta k souboru ve formátu EDF. Specifickou funkcionalitou je, že když výchozí dataset \filename{Siena Scalp EDF} není na disku nalezen, program automaticky využije nástroj \command{curl} k jeho stažení z internetu.
+    \item \textbf{Mód zpracování:} Výběr konkrétní implementace algoritmu (sekvenční/paralelní verze na CPU, různé úrovně vektorizace, nebo implementace na GPU).
+    \item \textbf{Počet iterací:} Nastavení počtu opakování konvoluce pro získání statisticky relevantních výsledků měření (výchozí hodnota je 10).
+    \item \textbf{Uložení výstupu:} Volba, zda se mají vyfiltrovaná data uložit, a specifikace cílové složky.
+\end{enumerate}
+
+\section{Prezentace výstupů a metrik}
+
+Během zpracování dat aplikace průběžně informuje uživatele o stavu výpočtu pomocí standardního výstupu. Před zahájením benchmarku jsou vypsány parametry konvolučního jádra (typ Gaussovo jádro, velikost, poloměr a sigma) a parametry načtených dat (počet kanálů, vzorků a celková velikost v bajtech).
+
+Po dokončení sady měření program vypíše detailní souhrn, který obsahuje:
+\begin{itemize}
+    \item \textbf{Time Breakdown:} Průměrný celkový čas běhu, čistý čas výpočtu (compute) a čas strávený paměťovými operacemi pro CPU i GPU. U GPU verze je navíc vyčíslen overhead spojený s API a spouštěním kernelu.
+    \item \textbf{Metrics:} Výkonnostní metriky zahrnující propustnost (Throughput) v MSamples/s a výpočetní výkon v GFLOPS. Obě metiky jsou počítané z času výpočtu.
+\end{itemize}
+
+Ukázka z reálného běhu programu, demonstrující konfiguraci, spuštění benchmarku pro CPU a GPU varianty a využití funkce návratu v menu, je uvedena ve výpisu \ref{lst:cmd_cli_benchmark_run}.
+
+\begin{console}{Ukázka běhu programu s konfigurací a výsledky benchmarku\label{lst:cmd_cli_benchmark_run}}
+========================================
+              Welcome to                
+  EEG Linear Filter Benchmark Suite     
+========================================
+Controls:
+ [ENTER]: Confirm default value
+ 'b'    : Go back to previous step
+----------------------------------------
+Enter path to the input EDF file:
+(Default: Siena Scalp EEG - 1.0.0/PN01/PN01-1)
+> 
+
+Select benchmark mode:
+-1 - WHOLE_BENCHMARK_SUITE (Default)
+ 0 - CPU_SEQ_APPLE
+ ...
+10 - GPU_32BIT
+> 0
+
+Enter number of benchmark iterations
+(Default: 10)
+> 
+
+Do you want to save the results? (y/n):
+(Default n)
+> 
+========================================
+Configuration complete. Starting...     
+========================================
+Convolution kernel: Gaussian
+Size: 513 | Radius: 256 | Sigma: 1
+Loading file: EegLinearFilter/data/PN01-1.edf
+...
+========================================
+Starting benchmark suite
+========================================
+Mode: CPU_SEQ_APPLE
+----------------------------------------
+Run 1: 14.1087s
+...
+Run 10: 12.7284s
+----------------------------------------
+AVG results over 10 runs:
+Time Breakdown:
+  Total: 13.1627s
+  Compute: 12.9699s
+  Mem Ops: 0.192749s (CPU)
+Metrics:
+  Throughput: 67.0905 MSamples/s
+  Performance: 68.8349 GFLOPS
+========================================
+Done!
+========================================
+Do you want to run another benchmark? (y/n):
+> n
+Exiting application. Goodbye!
+\end{console}
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Validace a správnost výsledků}
+
+Vzhledem k absenci referenčního analytického řešení byla pro ověření korektnosti implementace zvolena metoda křížové validace. Předpokladem je, že pokud různé implementace algoritmu (sekvenční, paralelní, vektorizované, GPU) dospějí ke shodným výsledkům nad stejnými daty, lze implementaci považovat za správnou.
+
+Významnou roli při validaci hraje také referenční implementace využívající optimalizovanou knihovní funkci \texttt{vDSP\_conv} z frameworku Apple Accelerate (mód \texttt{CPU\_SEQ\_APPLE}).
+
+\section{Metodika porovnání}
+
+Pro automatizované porovnání výstupů všech implementovaných módů byl vytvořen validační skript \texttt{results\_similarity\_by\_mode.py} v jazyce Python. Ten provádí komparaci "každý s každým" na úrovni jednotlivých vzorků uložených ve výstupních souborech EDF.
+
+Jelikož formát EDF ukládá data jako 16-bitová celá čísla (integer)~\cite{edf_spec}, porovnává skript přímo tyto hodnoty. Vlivem odlišného průběhu výpočtů v plovoucí řádové čárce při různých úrovních optimalizace se nepodařilo zcela eliminovat drobné odchylky. Rozdíl o hodnotě 1 (na úrovni celočíselné reprezentace) je proto klasifikován jako akceptovatelná zaokrouhlovací chyba.
+
+Validační skript generuje tři typy výstupů:
+\begin{enumerate}
+    \item \textbf{Souhrnný report v konzoli:} Tabulka shody mezi všemi páry módů.
+    \item \textbf{CSV reporty:} Detailní seznam míst, kde došlo k neshodě.
+    \item \textbf{Vizualizace (PDF):} Grafické znázornění distribuce chyb v signálu.
+\end{enumerate}
+
+\section{Výsledky validace}
+
+Jako testovací dataset byl použit \filename{Siena Scalp EEG - 1.0.0/PN01/PN01-1} který má následující parametry:
+\begin{itemize}
+    \item Počet signálů: 35
+    \item Vzorků na signál: 24 861 184 (celkem cca 870 milionů vzorků)
+    \item Velikost dat: 1659 MB
+\end{itemize}
+
+Níže uvedený výpis \ref{tab:result_similarity_comparison} zobrazuje kompletní tabulku porovnání. Sloupec \textit{MATCH \%} indikuje procentuální shodu, \textit{DIFF COUNT} absolutní počet odlišných vzorků a \textit{MAX DIFF} maximální nalezený rozdíl v hodnotě některého ze vzorků.
+
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{llcrr}
+\caption{Tabulka porovnání podobnosti výsledků pro dataset PN01-1} \label{tab:result_similarity_comparison} \\
+\toprule
+\textbf{File A} & \textbf{File B} & \textbf{Match} & \textbf{Diff Count} & \textbf{Max Diff} \\
+\midrule
+\endfirsthead
+
+\multicolumn{5}{c}{\tablename\ \thetable\ -- \textit{pokračování z předchozí strany}} \\
+\toprule
+\textbf{File A} & \textbf{File B} & \textbf{Match} & \textbf{Diff Count} & \textbf{Max Diff} \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{5}{r}{\textit{(pokračování na další straně)}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_PAR\_MANUAL\_VEC} & 100.00\% & 9577 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_PAR\_NAIVE} & 100.00\% & 10795 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_PAR\_NO\_VEC} & 100.00\% & 2240 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_SEQ\_APPLE} & 100.00\% & 11530 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_SEQ\_AUTO\_VEC} & 100.00\% & 0 & 0 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 9577 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 10795 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 2240 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 26325 & 1 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 26325 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_PAR\_NAIVE} & 100.00\% & 9018 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_PAR\_NO\_VEC} & 100.00\% & 10349 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_APPLE} & 100.00\% & 10073 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_AUTO\_VEC} & 100.00\% & 9577 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 0 & 0 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 9018 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 10349 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 25994 & 1 \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 25994 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_PAR\_NO\_VEC} & 100.00\% & 10533 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_SEQ\_APPLE} & 100.00\% & 10855 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_SEQ\_AUTO\_VEC} & 100.00\% & 10795 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 9018 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 0 & 0 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 10533 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{GPU\_32BIT} & 100.00\% & 26298 & 1 \\
+\texttt{CPU\_PAR\_NAIVE} & \texttt{GPU\_NAIVE} & 100.00\% & 26298 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{CPU\_SEQ\_APPLE} & 100.00\% & 11870 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{CPU\_SEQ\_AUTO\_VEC} & 100.00\% & 2240 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 10349 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 10533 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 0 & 0 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 26499 & 1 \\
+\texttt{CPU\_PAR\_NO\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 26499 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{CPU\_SEQ\_AUTO\_VEC} & 100.00\% & 11530 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 10073 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 10855 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 11870 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{GPU\_32BIT} & 100.00\% & 25439 & 1 \\
+\texttt{CPU\_SEQ\_APPLE} & \texttt{GPU\_NAIVE} & 100.00\% & 25439 & 1 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & \texttt{CPU\_SEQ\_MANUAL\_VEC} & 100.00\% & 9577 & 1 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 10795 & 1 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 2240 & 1 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 26325 & 1 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 26325 & 1 \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_NAIVE} & 100.00\% & 9018 & 1 \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 10349 & 1 \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 25994 & 1 \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 25994 & 1 \\
+\texttt{CPU\_SEQ\_NAIVE} & \texttt{CPU\_SEQ\_NO\_VEC} & 100.00\% & 10533 & 1 \\
+\texttt{CPU\_SEQ\_NAIVE} & \texttt{GPU\_32BIT} & 100.00\% & 26298 & 1 \\
+\texttt{CPU\_SEQ\_NAIVE} & \texttt{GPU\_NAIVE} & 100.00\% & 26298 & 1 \\
+\texttt{CPU\_SEQ\_NO\_VEC} & \texttt{GPU\_32BIT} & 100.00\% & 26499 & 1 \\
+\texttt{CPU\_SEQ\_NO\_VEC} & \texttt{GPU\_NAIVE} & 100.00\% & 26499 & 1 \\
+\texttt{GPU\_32BIT} & \texttt{GPU\_NAIVE} & 100.00\% & 0 & 0 \\
+\end{longtable}
+
+Z tabulky je patrné, že maximální chyba (MAX DIFF) nikdy nepřekročila hodnotu 1. Počet neshod se pohybuje v řádech desítek tisíc, což je v kontextu celkového počtu 870 milionů vzorků statisticky zanedbatelné a potvrzuje funkční ekvivalenci všech implementací.
+
+\subsection{Analýza odchylek}
+
+Pro hlubší zkoumání chyb generuje skript CSV soubory mapující přesnou polohu a hodnotu odchylek. Ukázka obsahu takového souboru je ve výpisu \ref{lst:csvDiff}. Sloupce identifikují kanál, časový index vzorku, surové hodnoty z obou porovnávaných souborů a velikost rozdílu.
+
+\begin{console}{Ukázka CSV reportu s detekovanými rozdíly\label{lst:csvDiff}}
+Channel,Sample Index,Value A (Raw),Value B (Raw),Diff
+34,2914,15312,15313,1
+20,3159,347,346,1
+31,4096,3955,3956,1
+31,7513,3981,3980,1
+1,11624,17480,17481,1
+...
+\end{console}
+
+Pro vizuální kontrolu, zda se chyby nevyskytují v shlucích (což by mohlo indikovat systematickou chybu algoritmu), jsou generovány vizualizace ve formátu PDF. Obrázek \ref{fig:diffPlot} ukazuje srovnání automatické a manuální vektorizace. Body v grafu reprezentují místa, kde došlo k neshodě. Z rovnoměrného rozložení chyb napříč kanály i časem lze usuzovat, že se jedná o náhodné zaokrouhlovací chyby bez lokálních anomálií.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\textwidth]{img/ppr/dist_CPU_PAR_AUTO_VEC_vs_CPU_PAR_MANUAL_VEC.pdf}
+    \caption{Porovnání výstupů módů \texttt{CPU\_PAR\_AUTO\_VEC} a \texttt{CPU\_PAR\_MANUAL\_VEC}.}
+    \label{fig:diffPlot}
+\end{figure}
+
+Kompletní výsledky provedené analýzy jsou k dispozici v elektronické příloze této práce.
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Výkonnostní analýza}
+Tato kapitola analyzuje přínos implementovaných optimalizačních technik na základě výsledků syntetických testů. Analýza se zaměřuje na porovnání výkonu v závislosti na velikosti konvolučního jádra a objemu dat. Dále hodnotí efektivitu využití hardwarových prostředků a škálovatelnost řešení na platformě Apple Silicon. Součástí vyhodnocení je i analýza limitů a efektivity paralelizace s využitím Amdahlova, Gustafsonova a Karp-Flattova zákona. Veškeré naměřené hodnoty a detailní analýzy jsou k dispozici v příloze této práce.
+
+\section{Metodika měření}\label{sec:metodika}
+
+Pro zajištění reprodukovatelnosti výsledků byl stanoven striktní testovací protokol. Referenčním zařízením je \textbf{MacBook Pro 14 (2021)} s čipem \textbf{Apple M1 Pro} (8 CPU jader, 14 GPU jader), napájený ze sítě pro vyloučení vlivu správy energie na stabilitu výkonu.
+
+Eliminace vnějších vlivů na měření proběhla následovně:
+\begin{itemize}
+    \item Ukončení všech uživatelských aplikací.
+    \item Deaktivace síťových rozhraní a automatických aktualizací.
+    \item Absence jakékoliv uživatelské interakce během testu (zamezení I/O přerušení).
+\end{itemize}
+
+\subsection{Sběr dat}
+
+Měření výkonu probíhalo napříč všemi implementovanými verzemi kódu (zahrnující CPU varianty s různou úrovní vektorizace i GPU implementace). Testy sledovaly chování algoritmů při změně velikosti konvolučního jádra i objemu vstupních dat.
+
+Aby byly výsledky statisticky průkazné, byla každá konfigurace změřena celkem 40krát. Schéma měření bylo následující:
+\begin{enumerate}
+    \item Algoritmus se spustil v \textbf{10 iteracích} bezprostředně po sobě.
+    \item Tento desetinnásobný cyklus se zopakoval ve \textbf{4 nezávislých spuštěních}.
+\end{enumerate}
+
+Každý jednotlivý běh byl zaznamenán, čímž vznikl dataset obsahující 7040 záznamů, které byly následně analyzovány.
+
+\subsection{Statistické zpracování a metriky}
+
+K eliminaci odlehlých hodnot způsobených nedeterminismem operačního systému byla použita dvoustupňová agregace mediánem:
+\begin{enumerate}
+    \item \textbf{Agregace běhu:} Medián z 10 bezprostředně za sebou proběhlých iterací (eliminace vlivu studeného startu hardwaru).
+    \item \textbf{Finální hodnota:} Medián ze 4 agregovaných běhů (výsledná hodnota konfigurace).
+\end{enumerate}
+
+Jako hlavní srovnávací metrika byl zvolen výpočetní výkon v \textbf{GFLOPS}. Tato volba umožňuje nejen porovnání nezávisle na délce trvání úlohy, ale také vztažení výsledků k teoretickému maximálnímu výkonu hardwaru, čímž lze přímo kvantifikovat efektivitu využití výpočetních jednotek. Výpočet vychází z čistého času výpočtu $T_{compute}$:
+
+\begin{equation}
+    P = \frac{N_{samples} \times (2 \cdot R + 1) \times 2}{T_{compute} \times 10^9}
+\end{equation}
+
+Kde $N_{samples}$ značí počet vzorků, $R$ poloměr jádra a násobitel 2 zohledňuje operaci FMA (Fused Multiply-Add) jako dvě operace v plovoucí řádové čárce.
+%
+%
+%
+\section{Porovnání implementací}
+
+Tato sekce srovnává všechny realizované přístupy na fixní konfiguraci úlohy. Pro testování byl zvolen reprezentativní scénář nad datasetem \filename{PN01-1.edf} (870 milionů vzorků, 1659 MB) s konvolučním jádrem o poloměru $R=256$ (celková velikost 513 prvků). Zvolená konfigurace představuje dostatečně robustní úlohu, kde se již plně projevují benefity vektorizace, paralelizace i akcelerace na GPU a minimalizuje se vliv režie spouštění vláken či kernelů.
+
+\subsection{Souhrnné výsledky}
+
+Naměřené výsledky v tabulce \ref{tab:single_dataset_performance_summary} odhalují tři zřetelné výkonnostní úrovně: implementace na GPU, paralelní CPU implementace a sekvenční CPU algoritmy. Toto rozvrstvení potvrzuje i graf \ref{fig:single_dataset_combined_summary}. Z výsledků je patrné, že pro úlohu 1D lineární konvoluce je paralelizace výpočtu velmi přínosná, neboť i naivní paralelní implementace svým výkonem předčily veškerá sekvenční řešení.
+
+\begin{table}[ht]
+\centering
+\caption{Srovnání výkonnostních parametrů jednotlivých implementací ($R=256$, Dataset PN01-1)}
+\label{tab:single_dataset_performance_summary}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Mód} & \textbf{Medián celkového času} & \textbf{Čas výpočtu} & \textbf{Výkon} \\
+ & [s] & [s] & [GFLOPS] \\
+\midrule
+\multicolumn{4}{l}{\textit{GPU Implementace}} \\
+\texttt{GPU\_32BIT} & \textbf{0.5333} & \textbf{0.3312} & \textbf{2695.52} \\
+\texttt{GPU\_NAIVE} & 1.3660 & 1.1615 & 768.66 \\
+\midrule
+\multicolumn{4}{l}{\textit{CPU Paralelní implementace (8 jader)}} \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & 1.7247 & 1.6871 & 529.17 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & 1.7385 & 1.6996 & 525.29 \\
+\texttt{CPU\_PAR\_NO\_VEC} & 2.9227 & 2.8713 & 310.93 \\
+\texttt{CPU\_PAR\_NAIVE} & 5.9735 & 5.9230 & 150.73 \\
+\midrule
+\multicolumn{4}{l}{\textit{CPU Sekvenční implementace (1 jádro)}} \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & 10.2102 & 10.1744 & 87.75 \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & 10.3050 & 10.2692 & 86.94 \\
+\texttt{CPU\_SEQ\_APPLE} (vDSP) & 12.7113 & 12.6721 & 70.45 \\
+\texttt{CPU\_SEQ\_NO\_VEC} & 17.1507 & 17.1123 & 52.17 \\
+\texttt{CPU\_SEQ\_NAIVE} & 42.2808 & 42.2409 & 21.14 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/analytics/single_dataset_signle_radius/combined_summary.pdf}
+    \caption{Souhrnné porovnání celkového a výpočetního času všech implementací ($R=256$, Dataset PN01-1).}
+    \label{fig:single_dataset_combined_summary}
+\end{figure}
+
+Detailní pohled na data odhaluje zajímavý fenomén při srovnání automatické (\texttt{AUTO\_VEC}) a manuální (\texttt{MANUAL\_VEC}) vektorizace. Ačkoliv jsou si výkonnostně velmi blízké, měření vykazují konzistentní trend. Zatímco v sekvenčním režimu mírně vítězí automatická optimalizace (87,75 GFLOPS oproti 86,94 GFLOPS), při paralelním zapojení všech jader se situace obrací ve prospěch manuálního přístupu (529,17 GFLOPS oproti 525,29 GFLOPS). Tento jev je pravděpodobně způsoben rozdíly v efektivitě distribuce dat a práce s pamětí. Zatímco při paralelním zpracování se drobné zdržení jednoho jádra ztratí v plynulém výkonu ostatních, v sekvenčním režimu tento kompenzační efekt chybí. Každá neefektivita se tak naplno projeví ve výsledném čase, což nahrává preciznosti optimalizací kompilátoru.
+
+Vzájemné poměry zrychlení mezi všemi testovanými metodami jsou vizualizovány formou matice na obrázku \ref{fig:speedup_matrix}. Zde je jasně vidět dominantní postavení optimalizované GPU verze, která dosahuje zrychlení 128$\times$ oproti základní naivní implementaci na CPU.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/analytics/single_dataset_signle_radius/speedup_matrix.pdf}
+    \caption{Matice zrychlení (Speedup Matrix) pro dataset PN01-1 a jádro $R=256$. Hodnoty udávají, kolikrát je metoda v řádku rychlejší než metoda ve sloupci.}
+    \label{fig:speedup_matrix}
+\end{figure}
+
+\subsection{Analýza CPU výkonu a konfrontace s teorií}
+
+Základní naivní implementace (\texttt{CPU\_SEQ\_NAIVE}) dosahuje výkonu 21 GFLOPS. Díky optimalizacím stoupá výkon sekvenčního zpracování na cca 87 GFLOPS, což představuje \textbf{4,15násobné zrychlení}. Teoretický maximální výkon jádra Firestorm je odhadován na 103 GFLOPS a tak optimalizované sekvenční verze dosahují přibližně \textbf{85 \% teoretického maxima}. Zajímavé je srovnání s knihovnou Apple Accelerate (\texttt{CPU\_SEQ\_APPLE}), která dosahuje 70,45 GFLOPS. Vlastní implementace optimalizovaná pro specifický typ konvoluce tak v tomto případě překonává obecnou knihovní funkci \texttt{vDSP\_conv}.
+
+Při zapojení všech 8 jader škáluje výkon na 525 GFLOPS -- 529 GFLOPS. Teoretický limit celého CPU (multicore) se pohybuje v rozmezí 660--700 GFLOPS. Dosažená hodnota tedy odpovídá přibližně \textbf{75--80 \% teoretického maxima} celého čipu.
+
+Dalším důležitým ukazatelem je, že stabilita optimalizovaného sekvenčního i paralelního výpočtu je vysoká (viz obr. \ref{fig:cpu_par_auto_vec}). Rozptyl naměřených časů je minimální a pohybuje se v řádu desítek milisekund (odchylka pod 2 \%).
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/analytics/single_dataset_signle_radius/CPU_PAR_AUTO_VEC.pdf}
+    \caption{Průběh výpočtu módu \texttt{CPU\_PAR\_AUTO\_VEC} v čase (10 iterací, 4 běhy) pro $R=256$ a dataset PN01-1.}
+    \label{fig:cpu_par_auto_vec}
+\end{figure}
+
+\subsection{Analýza GPU výkonu a hardwarové limity}
+
+Nejvýkonnější implementací je \texttt{GPU\_32BIT} s výkonem \textbf{2695 GFLOPS} (2.7 TFLOPS). Oproti naivní GPU verzi (768 GFLOPS) přináší provedené optimalizace nárůst výkonu o 350 \%.
+
+Dle analýz třetích stran~\cite{nbc_gpu} dosahuje GPU čipu M1 Pro teoretického výkonu až 4,6 TFLOPS. Naměřená hodnota 2,7 TFLOPS tak představuje přibližně 59 \% tohoto odhadovaného maxima. Pro ověření, zda je tento limit dán neefektivitou implementace či vlastnostmi hardwaru, byl proveden srovnávací benchmark pomocí knihovny \textbf{PyTorch} (MPS backend). Tento test (skript \texttt{measure\_gpu\_power.py}) realizoval konvoluci nad synteticky generovanými daty o shodných rozměrech a naměřil trvalý výkon \textbf{2561 GFLOPS}.
+
+Vlastní implementace v jazyce Metal tedy mírně překonává (o cca 5 \%) vysoce optimalizovanou knihovnu PyTorch. To naznačuje, že hodnota kolem 2.7 TFLOPS je pro tento typ operace (1D konvoluce) na daném hardwaru reálným maximem.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/analytics/single_dataset_signle_radius/GPU_32BIT.pdf}
+    \caption{Průběh výpočtu módu \texttt{GPU\_32BIT} v čase (10 iterací, 4 běhy) pro $R=256$ a dataset PN01-1.}
+    \label{fig:gpu_32bit}
+\end{figure}
+
+\subsection{Teoretická analýza paralelizace}
+
+Pro kvantifikaci efektivity paralelního zpracování byly na implementované algoritmy aplikovány teoretické metriky zrychlení ($S$), Karp-Flattova metrika ($e$) a Gustafsonův zákon ($S_{scaled}$). Tyto metriky jsou pro počet jader $P=8$ definovány vztahy:
+
+\begin{equation}
+    S = \frac{T_s}{T_p}, \quad e = \frac{\frac{1}{S} - \frac{1}{P}}{1 - \frac{1}{P}}, \quad S_{scaled} = P - (P-1)e
+\end{equation}
+
+Pro přesné zhodnocení byly do těchto vztahů dosazeny časy čistého výpočtu ($T_{compute}$), které nezahrnují alokaci a nulování paměti. Tím je odfiltrována režie přípravy dat a izolována efektivita samotného konvolučního algoritmu včetně režie správy vláken. Výsledné hodnoty pro všechny implementační varianty shrnuje tabulka \ref{tab:parallel_metrics}.
+
+\begin{table}[ht]
+\centering
+\caption{Metriky paralelizace vypočtené z časů výpočtů ($P=8$)}
+\label{tab:parallel_metrics}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Implementace} & \textbf{$T_s$ [s]} & \textbf{$T_p$ [s]} & \textbf{Zrychlení ($S$)} & \textbf{Karp-Flatt ($e$)} & \textbf{Gustafson ($S_{scaled}$)} \\
+\midrule
+\texttt{NAIVE}       & 42,24 & 5,92 & 7,14 & 0,017 (1,7 \%) & 7,88 \\
+\texttt{NO\_VEC}     & 17,11 & 2,87 & 5,96 & 0,049 (4,9 \%) & 7,66 \\
+\texttt{AUTO\_VEC}   & 10,17 & 1,70 & 5,98 & 0,048 (4,8 \%) & 7,66 \\
+\texttt{MANUAL\_VEC} & 10,27 & 1,69 & 6,07 & 0,045 (4,5 \%) & 7,68 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Nejvyšší hodnoty zrychlení ($S=7,13$) a nejnižší sériovou režii ($e=1,7\,\%$) vykazuje naivní implementace. Kvůli silné datové závislosti a nevyužívání registrů je výpočet limitován rychlostí samotného výpočtu, nikoliv propustností paměti. Jednotlivá vlákna tak nezahlcují sběrnici a nebrzdí se navzájem, což se blíží ideálnímu lineárnímu škálování podle Amdahlova zákona.
+
+Naopak u optimalizovaných variant (\texttt{NO\_VEC}, \texttt{AUTO\_VEC} a \texttt{MANUAL\_VEC}) dochází k poklesu zrychlení na úroveň $S \approx 6,0$ a nárůstu sériové režie na cca $4,5\text{--}4,9\,\%$. Skutečnost, že tento limit postihuje i nevektorizovanou verzi (\texttt{NO\_VEC}), dokazuje, že již samotná algoritmická optimalizace zrychlila výpočet natolik, že 8 jader naráží na limit propustnosti paměťové sběrnice. Dalším důkazem tohoto tvrzení je vysoká hodnota Gustafsonova zákona ($S_{scaled} > 7,6$), která dokládá, že samotný algoritmus je navržen efektivně a úzkým hrdlem jsou výhradně sdílené hardwarové prostředky.
+%
+%
+%
+\section{Analýza škálování s velikostí dat}
+
+Pro ověření stability a efektivity implementací byl proveden experiment sledující výpočetní výkon v závislosti na rostoucím objemu vstupních dat. Velikost konvolučního jádra byla v tomto testu fixována na $R=256$. Testované spektrum velikosti vstupů sahá od 1,9 milionu prvků (cca 7,6 MB) až po 1,1 miliardy prvků (cca 4,4 GB). Naměřené hodnoty (GFLOPS) pro tři reprezentativní velikosti dat jsou shrnuty v tabulce \ref{tab:data_scaling_all_datasets}.
+
+\begin{table}[ht]
+\centering
+\caption{Vývoj výpočetního výkonu [GFLOPS] v závislosti na velikosti vstupních dat ($R=256$)}
+\label{tab:data_scaling_all_datasets}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Implementace} & \textbf{Malá data} & \textbf{Střední data} & \textbf{Velká data} \\
+ & (1,9 mil. prvků / 7,6 MB) & (175 mil. prvků / 700 MB) & (1,1 mld. prvků / 4,4 GB) \\
+\midrule
+\texttt{GPU\_32BIT}         & 2\,625,92 & 2\,727,01 & 2\,701,68 \\
+\texttt{GPU\_NAIVE}         & 700,44    & 772,24    & 769,27    \\
+\midrule
+\texttt{CPU\_PAR\_MANUAL\_VEC} & 516,39 & 530,25 & 528,45 \\
+\texttt{CPU\_PAR\_AUTO\_VEC}   & 510,18 & 526,35 & 524,66 \\
+\texttt{CPU\_PAR\_NO\_VEC}     & 307,46 & 312,03 & 310,77 \\
+\texttt{CPU\_PAR\_NAIVE}       & 210,91 & 156,73 & 150,58 \\
+\midrule
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & 86,39  & 87,06  & 85,97  \\
+\texttt{CPU\_SEQ\_AUTO\_VEC}   & 87,42  & 87,64  & 87,01  \\
+\texttt{CPU\_SEQ\_APPLE}       & 69,85  & 70,47  & 70,52  \\
+\texttt{CPU\_SEQ\_NO\_VEC}     & 51,50  & 51,91  & 51,29  \\
+\texttt{CPU\_SEQ\_NAIVE}       & 32,95  & 21,44  & 21,13  \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Linearita výpočtu}
+
+Pro analýzu škálovatelnosti bylo sledováno, zda nárůst doby výpočtu odpovídá nárůstu objemu vykonané práce. Jako srovnávací metrika byl zvolen počet operací v plovoucí řádové čárce (G-Ops), nikoliv prostý počet záznamů v datasetu. Tento přístup přesněji vyjadřuje skutečnou zátěž procesoru, jelikož není zkreslen vlivem okrajových podmínek vzniklých při aplikaci konvolučního jádra na hrany vstupních dat a odpovídá reálnému množství aritmetických operací, které musí ALU zpracovat. Objem vykonané práce $W$ v jednotkách G-Ops je definován vztahem:
+
+\begin{equation}
+    W = \frac{N_{out} \cdot (2R + 1) \cdot 2}{10^9}
+    \label{eq:gops_calc}
+\end{equation}
+
+kde $N_{out}$ představuje počet vypočítaných výstupních prvků (zohledňující zkrácení o okraje), $R$ je poloměr konvolučního jádra a člen $(2R+1)$ odpovídá celkové šířce jádra. Faktor $2$ reprezentuje dvojici operací násobení a sčítání (FMA -- Fused Multiply-Add), které se provádějí pro každý prvek jádra nad každým vzorkem signálu.
+
+Referenční hodnotou pro toto srovnání je nejmenší naměřená sada dat o velikosti 1,9 milionu prvků (7,6 MB), která vyžaduje provedení 2,0 G-Ops. V tabulce \ref{tab:scaling_factors_all_datasets} jsou časy výpočtu větších úloh vyjádřeny jako násobky této základní hodnoty.
+
+\begin{table}[ht]
+\centering
+\caption{Faktory nárůstu času výpočtu vztažené k počtu operací při srovnání vlivu velikosti vstupních dat (Baseline = 2,0 G-Ops)}
+\label{tab:scaling_factors_all_datasets}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Implementace} & \textbf{10,9 G-Ops} & \textbf{394 G-Ops} & \textbf{1081 G-Ops} & \textbf{Prům. odchylka} \\
+ & (Ideál $5,5\times$) & (Ideál $197\times$) & (Ideál $541\times$) & \\
+\midrule
+\texttt{GPU\_32BIT}            & 5,0$\times$ & 184,4$\times$ & 500,1$\times$ & -7,8 \% \\
+\texttt{GPU\_NAIVE}            & 5,2$\times$ & 182,0$\times$ & 501,9$\times$ & -6,7 \% \\
+\midrule
+\texttt{CPU\_PAR\_MANUAL\_VEC} & 5,5$\times$ & 195,6$\times$ & 538,3$\times$ & -0,5 \% \\
+\texttt{CPU\_PAR\_AUTO\_VEC}   & 5,4$\times$ & 192,0$\times$ & 528,3$\times$ & -2,4 \% \\
+\texttt{CPU\_PAR\_NO\_VEC}     & 5,5$\times$ & 197,5$\times$ & 543,5$\times$ & +0,2 \% \\
+\texttt{CPU\_PAR\_NAIVE}       & 5,5$\times$ & 277,2$\times$ & 771,9$\times$ & +29,9 \% \\
+\midrule
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & 5,5$\times$ & 197,9$\times$ & 551,5$\times$ & +0,9 \% \\
+\texttt{CPU\_SEQ\_AUTO\_VEC}   & 5,5$\times$ & 199,2$\times$ & 552,2$\times$ & +1,5 \% \\
+\texttt{CPU\_SEQ\_APPLE}       & 5,5$\times$ & 198,2$\times$ & 543,6$\times$ & +0,6 \% \\
+\texttt{CPU\_SEQ\_NO\_VEC}     & 5,5$\times$ & 197,1$\times$ & 550,3$\times$ & +0,6 \% \\
+\texttt{CPU\_SEQ\_NAIVE}       & 7,3$\times$ & 309,4$\times$ & 855,3$\times$ & +51,9 \% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Naměřená data odhalují tři zásadní trendy. Prvním je vysoká stabilita optimalizovaných CPU implementací, které si udržují nízkou průměrnou odchylku (pod 2,5\,\%) a jejichž výkon roste předvídatelně bez ohledu na to, zda data leží v cache nebo v operační paměti.
+
+Druhým trendem je rozdílný nástup degradace u naivních verzí. Zatímco sekvenční verze výrazně zpomaluje již u úlohy s 10,9 G-Ops (cca 42 MB dat), paralelní implementace si v tomto bodě drží efektivitu a k propadu výkonu u ní dochází až u řádově větších datasetů. Tento posun naznačuje, že paralelizace oddaluje okamžik nasycení paměti.
+
+Třetím specifikem je „záporná“ odchylka u GPU, která potvrzuje, že grafické akcelerátory pracují efektivněji s velkými objemy dat, kdy se fixní režie spojená se startem výpočtu stává v celkovém čase zanedbatelnou.
+
+\subsection{Vliv paměťové hierarchie a System Level Cache}
+
+Detailní pohled na výpočetní propustnost (GFLOPS) odhaluje příčinu rozdílného chování naivních algoritmů. Srovnání grafů sekvenčních a paralelních implementací (Obrázek \ref{fig:data_scaling_seq_all_datasets} a \ref{fig:data_scaling_par_all_datasets}) ukazuje, jak zásadní roli hraje velikost dat vzhledem k dostupné cache paměti.
+
+Kritický zlom nastává u sekvenční naivní implementace (\texttt{CPU\_SEQ\_NAIVE}) okamžitě při přechodu z referenční na úlohu s 10,9 G-Ops. Tato úloha odpovídá zpracování cca \textbf{42 MB} dat. Protože výkonná jádra procesoru sdílejí \textbf{L2 cache o velikosti 24 MB}, objem dat přesahuje její fyzickou kapacitu. To vede k rapidnímu nárůstu výpadků v cache, kdy procesor musí pro chybějící data sahat do pomalejší System Level Cache (SLC) nebo přímo do RAM. Důsledkem je strmý propad výkonu z 33 na 21 GFLOPS, viditelný na obrázku \ref{fig:data_scaling_seq_all_datasets}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\textwidth]{img/ppr/analytics/multiple_datasets/data_scaling_gflops_Sequential.pdf}
+    \caption{Srovnání škálování sekvenčních implementací v závislosti na velikosti vstupních dat.}
+    \label{fig:data_scaling_seq_all_datasets}
+\end{figure}
+
+U paralelní naivní verze je degradace pozvolnější (viz obrázek \ref{fig:data_scaling_par_all_datasets}), ačkoliv součet požadavků osmi jader (42 MB) rovněž přesahuje kapacitu sdílené L2 cache. Rozdíl v rychlosti propadu výkonu je dán schopností paralelizace skrývat latenci paměti, kdy je čekání jednoho vlákna na data maskováno výpočtem ostatních. Tento pokles se zastavuje u datasetu o velikosti 1,5 GB (394 G-Ops), kde se stabilizuje na hodnotě přibližně 150 GFLOPS.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\textwidth]{img/ppr/analytics/multiple_datasets/data_scaling_gflops_Parallel.pdf}
+    \caption{Srovnání škálování paralelních implementací v závislosti na velikosti vstupních dat.}
+    \label{fig:data_scaling_par_all_datasets}
+\end{figure}
+%
+%
+%
+\section{Analýza škálování s velikostí poloměru jádra}
+
+V této části se analyzuje vliv poloměru konvolučního jádra ($R$) na efektivitu výpočtu. Změnou tohoto parametru totiž dochází ke změně počtu aritmetických operací nutných pro získání jedné výstupní hodnoty, zatímco množství vstupních dat, nad kterými se provádí konvoluce, zůstává stejné. Tím pádem se na rozdíl od předchozího případu, kdy se měnil objem dat a testovalo se využití cache a propustnost paměti, se testuje efektivita samotného výpočtu a manipulace s daty. Co se experimentálních měření týče, tak ta byla provedena nad datasetem \filename{PN01-1.edf} (1659 MB) s poloměry konvolučního jádra v rozsahu $R=2$ až $1024$, čímž se otestovalo, jak jednotlivé algoritmy škálují svůj výkon s rostoucí aritmetickou intenzitou úlohy. Naměřené hodnoty výkonu pro vybrané poloměry jader shrnuje tabulka \ref{tab:radius_scaling_table}.
+
+\begin{table}[ht]
+\centering
+\caption{Závislost výpočetního výkonu [GFLOPS] na poloměru jádra $R$ (Dataset PN01-1)}
+\label{tab:radius_scaling_table}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Implementace} & \textbf{R=2} & \textbf{R=16} & \textbf{R=32} & \textbf{R=64} & \textbf{R=256} & \textbf{R=1024} \\
+\midrule
+\multicolumn{7}{l}{\textit{GPU Implementace}} \\
+\texttt{GPU\_32BIT} & 206,16 & 1198,32 & 1801,55 & 2302,98 & 2695,52 & 2752,72 \\
+\texttt{GPU\_NAIVE} & 223,38 & 704,36 & 733,68 & 754,71 & 768,66 & 765,97 \\
+\midrule
+\multicolumn{7}{l}{\textit{CPU Paralelní implementace}} \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & 75,97 & 362,73 & 485,96 & 516,31 & 529,17 & 531,67 \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & 68,51 & 366,01 & 491,14 & 501,40 & 525,29 & 530,09 \\
+\texttt{CPU\_PAR\_NO\_VEC} & 33,28 & 239,61 & 279,10 & 298,92 & 310,93 & 318,03 \\
+\texttt{CPU\_PAR\_NAIVE} & 147,77 & 207,96 & 201,60 & 202,82 & 150,73 & 179,05 \\
+\midrule
+\multicolumn{7}{l}{\textit{CPU Sekvenční implementace}} \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & 25,93 & 76,66 & 81,81 & 84,03 & 86,94 & 87,68 \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & 23,35 & 80,82 & 83,38 & 85,11 & 87,75 & 88,00 \\
+\texttt{CPU\_SEQ\_APPLE} & 47,25 & 88,14 & 84,87 & 78,86 & 70,45 & 67,73 \\
+\texttt{CPU\_SEQ\_NO\_VEC} & 5,88 & 41,99 & 46,44 & 49,00 & 52,17 & 52,81 \\
+\texttt{CPU\_SEQ\_NAIVE} & 61,41 & 34,64 & 31,83 & 32,79 & 21,14 & 26,08 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Charakteristika GPU škálování}
+
+Nejvýraznější nárůst výkonu je naměřený u implementace na grafickém akcelerátoru. Varianta \texttt{GPU\_32BIT} startuje na hodnotě $206$ GFLOPS ($R=2$) a stoupá až k hranici $2700$ GFLOPS ($R=256$), kde se již výkon drží na konzistentní úrovni. Tento rozdíl je způsoben tím, že u malých poloměrů je objem výpočtů příliš malý a doba exekuce příliš krátká na to, aby se dokázala efektivně zakrýt latence přístupů do globální paměti a hardwarová režie spojená se spouštěním vláken. S rostoucím poloměrem se ale poměr aritmetických operací vůči načítání dat zvyšuje, čímž dochází k plnému vytížení výpočetních jednotek a potlačení vlivu paměťové latence.
+
+\subsection{Limity naivních algoritmů}
+
+U naivních implementací dosahuje výkon maxima při velmi malých velikostech konvolučního jádra a s jeho rostoucí velikostí postupně degraduje. U sekvenční varianty (\texttt{CPU\_SEQ\_NAIVE}) činí tento pokles přibližně 65~\%, a to z maximálně dosažených 64,79~GFLOPS při $R=4$ na minimální hodnotu 21~GFLOPS při $R=128$. U paralelní varianty je propad mírnější, přibližně 53~\%, konkrétně z 315,47~GFLOPS při $R=8$ na 147,30~GFLOPS při $R=128$.
+
+Hlavní příčinou tohoto chování je vnitřní smyčka implementace, která iteruje přes prvky konvolučního jádra. Kompilátor se při optimalizaci snaží tuto smyčku plně rozbalit, což je efektivní na malých jádrech. V těchto případech je naivní implementace dokonce rychlejší než optimalizované varianty. S rostoucí velikostí jádra se však pracovní data již nevejdou do 32 vektorových registrů, což vede k častějším přístupům do pomalejší paměti L1 a následnému poklesu výkonu.
+
+U paralelní varianty se navíc projevuje režie spojená se správou vláken, což potvrzují i výsledky optimalizované implementace. Tato režie má největší dopad na menších jádrech a s jejich rostoucí velikostí se její vliv postupně snižuje. Důsledkem je posun maximálního dosaženého výkonu paralelní varianty směrem k větším velikostem jader ve srovnání se sekvenční implementací.
+
+\subsection{Stabilizace optimalizovaných implementací}
+
+Zavedení blokového zpracování konvolučního jádra vedlo k stabilizaci výkonu u všech optimalizovaných verzí (sekvenčních i paralelních). Díky postupnému zpracování po blocích o velikosti \command{K_BATCH = 32} je kompilátoru garantováno, že se potřebná data vejdou do hardwarových registrů. Tím se eliminuje jejich přetečení a následné propady výkonu, které jsou vidět u velkých jader při zpracování naivní implementací.
+
+Paradoxně však u velmi malých jader ($R < 16$) optimalizované implementace zaostávají. Příčinou je právě struktura blokového zpracování, která vyžaduje existenci tzv. „dočišťovací“ smyčky pro zpracování zbytků jádra (části nedělitelné 32). U malých jader není splněna podmínka pro vstup do hlavní optimalizované větve (jelikož $2R+1 < 32$) a celý výpočet tak spadá do této záložní sekce.
+
+Problém spočívá v tom, že tato sekce využívá prohozené pořadí smyček (vnější iteruje přes prvky jádra, vnitřní přes data). To neumožňuje akumulovat průběžné výsledky konvoluce v registru (jako v naivní implementaci proměnnou \texttt{sum}), ale vynucuje přičítání mezivýsledků přímo do výstupního pole v paměti. To vede k nárůstu počtu paměťových operací z jedné (u naivní verze) na $2 \times (2R+1)$ (čtení i zápis pro každý prvek jádra) na každý vzorek, což způsobuje dramatický propad výkonu.
+
+\begin{code}{C++}{Struktura blokového zpracování a neefektivní dočišťovací smyčky}
+size_t k = 0;
+for (; k + KBatch <= KernelSize; k += KBatch) {
+    // ...Efektivní výpočet...
+}
+
+// Dočišťovací smyčka
+for (; k < KernelSize; ++k) {
+    const float kv = kernelPtr[k];
+    for (size_t out = 0; out < actualChunkSize; ++out) {
+        o_chunk[out] += d_chunk[out + k] * kv; 
+    }
+}
+\end{code}
+
+\subsection{Srovnání se systémovou knihovnou Apple vDSP}
+
+Naměřená data u systémové funkce \texttt{vDSP\_conv} naznačují, že tato funkce je primárně optimalizována pro zpracování kratších konvolučních jader.
+
+Své výkonnostní maximum 88,14~GFLOPS dosahuje tato funkce u jádra s poloměrem $R=16$ a s rostoucí velikostí jádra je však patrný pozvolný úbytek efektivity. Výkon se postupně snižuje z maxima na stabilní úroveň okolo 70,45~GFLOPS (pro $R=256$), což představuje pokles o přibližně 20~\%.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\textwidth]{img/ppr/analytics/multiple_kernel_sizes/scaling_analysis_gflops_Sequential.pdf}
+    \caption{Porovnání výkonu sekvenčních CPU implementací při změně poloměru konvolučního jádra.}
+    \label{fig:seq_kernel_scaling_gflops}
+\end{figure}
+%
+%
+%
+\section{Výkon na odlišných architekturách Apple Silicon}
+
+Pro ověření robustnosti implementace a potvrzení, že naměřené charakteristiky nejsou specifické pouze pro jednu konfiguraci hardwaru, byly experimenty replikovány na druhém zařízení s odlišnou konfigurací. Cílem tohoto srovnání je analyzovat chování algoritmů v prostředí s odlišným poměrem výpočetního výkonu a paměťové propustnosti.
+\subsection{Specifikace testovacích zařízení}
+
+Jako srovnávací zařízení byl zvolen \product{Apple MacBook Air 13 (2024)} osazený čipem \term{Apple M4}. Rozdíly mezi tímto zařízením a referenčním Apple MacBook Pro (M1 Pro) jsou v tabulce \ref{tab:hw_spec_comparison}.
+
+\begin{table}[ht]
+\centering
+\caption{Srovnání hardwarových parametrů testovacích zařízení}
+\label{tab:hw_spec_comparison}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Parametr} & \textbf{MacBook Pro (M1 Pro)} & \textbf{MacBook Air (M4)} \\
+\midrule
+\textbf{Generace čipu} & Apple M1 (2021) & Apple M4 (2024) \\
+\textbf{ISA} & ARMv8.5-A & ARMv9.4-A~\cite{nbc_m4} \\
+\textbf{CPU Konfigurace} & 8 Jader (6P + 2E) & 10 Jader (4P + 6E)~\cite{wiki_m4} \\
+\textbf{Frekvence P-Core} & 3,2 GHz & $\sim$4,4 GHz~\cite{nbc_m4} \\
+\textbf{Frekvence E-Core} & 2,0 GHz & $\sim$2,9 GHz~\cite{nbc_m4} \\
+\textbf{Vektorové registry} & 32 $\times$ 128-bit (NEON) & 32 $\times$ 128-bit (NEON) \\
+\textbf{Šířka pipeline} & 8-wide & 10-wide~\cite{jpr_m4_arch} \\
+\textbf{Teor. výkon (Single)} & $\sim$103 GFLOPS & $\sim$141 GFLOPS\textsuperscript{*} \\
+\textbf{Teor. výkon (Multi)} & $\sim$700 GFLOPS & $\sim$841 GFLOPS\textsuperscript{*} \\
+\midrule
+\textbf{Instr. Cache (P-Core)} & 192 KB & 192 KB~\cite{everymac_m4} \\
+\textbf{Data Cache (P-Core)} & 128 KB & 128 KB~\cite{everymac_m4} \\
+\textbf{L2 Cache (P-Cluster)} & 24 MB & 16 MB~\cite{everymac_m4} \\
+\textbf{System Level Cache} & 24 MB & 8 MB~\cite{lem_m4_specs} \\
+\textbf{Paměť (RAM)} & 16 GB LPDDR5 & 16 GB LPDDR5X~\cite{nbc_m4} \\
+\textbf{Propustnost paměti} & 200 GB/s & 120 GB/s~\cite{wiki_m4} \\
+\midrule
+\textbf{GPU Jádra} & 14 jader & 10 jader~\cite{nbc_m4} \\
+\textbf{GPU ALU} & 1792 ALU & 1280 ALU~\cite{nanoreview_m4_gpu} \\
+\textbf{GPU Cache} & 32 kB (Threadgroup) & 32 kB (Threadgroup)~\cite{apple_metal_tables} \\
+\textbf{GPU Výkon (FP32)} & $\sim$4,6 TFLOPS & $\sim$4,3 TFLOPS~\cite{cpumonkey_m4_gpu} \\
+\midrule
+\textbf{Chlazení} & Aktivní & Pasivní \\
+\bottomrule
+\multicolumn{3}{l}{\scriptsize \textsuperscript{*}Teoretický CPU výkonu pro M4 je dopočítán na základě frekvencí a architektury NEON.}
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Adaptace metodiky pro srovnávací měření}
+
+Pro zachování konzistence výsledků byla u srovnávacího zařízení aplikována metodika popsaná v sekci \ref{sec:metodika}, avšak s dvěma nezbytnými modifikacemi. První úpravou je redukce počtu opakování ze čtyř sad po deseti iteracích na jednu sadu. Druhá úprava zohledňuje absenci aktivního chlazení u modelu MacBook Air, kdy byly mezi jednotlivými měřeními zařazeny časové prodlevy pro vychladnutí čipu, aby se předešlo ovlivnění výkonu teplotou.
+
+\subsection{Výsledky srovnávacího měření}
+
+Validace proběhla na stejném datasetu \filename{PN01-1.edf} (1659 MB) s identickým konvolučním jádrem o poloměru $R=256$. Souhrnné výsledky pro obě platformy jsou uvedeny v tabulce \ref{tab:comparison_m1_m4}.
+
+\begin{table}[ht]
+\centering
+\caption{Srovnání výkonu a času výpočtu mezi čipy M1 Pro a M4 ($R=256$, Dataset PN01-1)}
+\label{tab:comparison_m1_m4}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Implementace} & \multicolumn{2}{c}{\textbf{Čas výpočtu} [s]} & \multicolumn{2}{c}{\textbf{Výkon} [GFLOPS]} & \textbf{Změna výkonu} \\
+ & \textbf{M1 Pro} & \textbf{M4} & \textbf{M1 Pro} & \textbf{M4} & \textbf{(M4 vs M1)} \\
+\midrule
+\multicolumn{6}{l}{\textit{GPU Implementace}} \\
+\texttt{GPU\_32BIT} & 0,331 & 0,346 & 2695,52 & 2581,10 & - 4,2 \% \\
+\texttt{GPU\_NAIVE} & 1,162 & 1,196 & 768,66 & 746,52 & - 2,9 \% \\
+\midrule
+\multicolumn{6}{l}{\textit{CPU Paralelní implementace}} \\
+\texttt{CPU\_PAR\_AUTO\_VEC} & 1,700 & 1,378 & 525,29 & 647,97 & + 23,4 \% \\
+\texttt{CPU\_PAR\_MANUAL\_VEC} & 1,687 & 1,511 & 529,17 & 591,03 & + 11,7 \% \\
+\texttt{CPU\_PAR\_NO\_VEC} & 2,871 & 2,283 & 310,93 & 391,13 & + 25,8 \% \\
+\texttt{CPU\_PAR\_NAIVE} & 5,923 & 3,136 & 150,73 & 284,68 & + 88,9 \% \\
+\midrule
+\multicolumn{6}{l}{\textit{CPU Sekvenční implementace}} \\
+\texttt{CPU\_SEQ\_AUTO\_VEC} & 10,174 & 8,053 & 87,75 & 110,86 & + 26,3 \% \\
+\texttt{CPU\_SEQ\_MANUAL\_VEC} & 10,269 & 8,914 & 86,94 & 100,15 & + 15,2 \% \\
+\texttt{CPU\_SEQ\_APPLE} (vDSP) & 12,672 & 9,652 & 70,45 & 92,50 & + 31,3 \% \\
+\texttt{CPU\_SEQ\_NO\_VEC} & 17,151 & 13,512 & 52,17 & 66,23 & + 27,0 \% \\
+\texttt{CPU\_SEQ\_NAIVE} & 42,241 & 19,566 & 21,14 & 45,63 & + 115,8 \% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsubsection{Efektivita využití hardwaru}
+
+Pro základní validaci kvality implementace byla naměřená data konfrontována s teoretickými maximy obou čipů, což potvrdilo vysokou hardwarovou přenositelnost optimalizovaných algoritmů. V případě grafických akcelerátorů je efektivita využití FP32 jednotek téměř identická, kdy M1 Pro dosahuje 58,6\,\% a M4 60,0\,\% teoretického výkonu. Podobně konzistentní chování vykazuje i paralelní CPU zpracování, kde i přes výrazně odlišnou propustnost paměti dosahují oba čipy srovnatelného vytížení (75,6\,\% u M1 Pro oproti 77,0\,\% u M4). Efektivita mírně klesla pouze u jednovláknového výkonu (78,7\,\% u M4 vs. 84,5\,\% u M1 Pro).
+
+Naměřená data zároveň odhalila neefektivitu manuální optimalizace na novější architektuře. Zatímco u čipu M1 Pro byl výkonnostní rozdíl mezi automatickou a manuální vektorizací zanedbatelný (pod 1\,\%), u M4 tento rozdíl vzrostl na přibližně 10\,\% ve prospěch automatické vektorizace. Tento jev naznačuje, že fixní struktura manuálně vektorizovaného kódu pravděpodobně brání plnému využití širší pipeline (10-wide u M4 oproti 8-wide u M1 Pro).
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        CHAPTER
+%
+% _____________________________________________________________________________
+%
+\chapter{Závěr}
+Cílem této práce byla implementace a optimalizace algoritmů pro filtraci EEG signálu pomocí lineární 1D konvoluce na platformě Apple Silicon. Výsledkem je sada algoritmů využívajících moderní standardy C++ a grafické API Metal, které pokrývají spektrum od referenčních naivních řešení až po vysoce optimalizované varianty využívající vektorizaci (NEON) a hardwarovou akceleraci (GPU).
+
+Experimentální část prokázala, že navržené implementace dokáží efektivně využít dostupný výpočetní výkon hardwaru. Optimalizovaná varianta pro GPU dosáhla na čipu M1 Pro výkonu přibližně 2,7~TFLOPS, což odpovídá využití 60~\% teoretického maxima čipu a překonává i měření provedená pomocí optimalizované knihovny PyTorch (MPS backend). V případě CPU implementace se podařilo dosáhnout výkonu přes 530~GFLOPS (cca 80~\% teoretického maxima při využití všech jader). Významným výsledkem je skutečnost, že vlastní optimalizovaná sekvenční implementace překonala v testech výkonnosti i nativní systémovou funkci \texttt{vDSP\_conv} z knihovny Apple Accelerate.
+
+Testování potvrdilo robustnost řešení vůči změnám parametrů úlohy i hardwarové konfigurace:
+\begin{itemize}
+    \item \textbf{Škálovatelnost:} Implementace vykazují stabilní výkon při zpracování různě velkých objemů dat i změně velikosti konvolučního jádra.
+    \item \textbf{Přenositelnost:} Srovnávací měření na novějším čipu Apple M4 potvrdilo, že navržené optimalizace nejsou specifické pouze pro architekturu M1, ale efektivně škálují i na novějších generacích procesorů.
+    \item \textbf{Validita:} Správnost výstupů byla ověřena křížovou validací všech implementací a srovnáním s referenční funkcí, přičemž maximální odchylka se pohybovala na úrovni statisticky nevýznamné zaokrouhlovací chyby.
+\end{itemize}
+
+I přes dosažené výsledky byly identifikovány oblasti pro budoucí rozvoj a optimalizaci. Prvním nedostatkem je pokles efektivity u konvolučních jader s malým poloměrem ($R < 16$), kde se negativně projevuje režie blokového zpracování a neefektivita dočišťovacích smyček. Pro tyto případy by bylo vhodné implementovat specializovanou větev algoritmu.
+
+Druhým a zásadním omezením pro nasazení do produkčního prostředí je práce s pamětí. Současná implementace načítá kompletní dataset do operační paměti RAM. Ačkoliv je toto řešení pro běžné EEG záznamy dostačující, u extrémně dlouhých měření naráží na fyzické limity zařízení. Budoucí vývoj by se měl zaměřit na implementaci streamovaného zpracování, které by umožnilo načítat a filtrovat data po částech, a tím zpracovávat soubory přesahující kapacitu dostupné operační paměti.
+
+I přes uvedená omezení představuje výsledná aplikace vysoce efektivní nástroj, který již v současné podobě umožňuje zpracovávat rozsáhlá EEG data řádově rychleji než běžně dostupné prostředky.
+%
+%
+%
+% _____________________________________________________________________________
+%
+%
+%        BACK MATTER (BIBLIOGRAPHY, LISTS, ...)
+%
+% _____________________________________________________________________________
+%
+\backmatter
+\printbibliography
+\listoffigures
+\listoftables
+\listoflistings
+% _____________________________________________________________________________
+%
+%		BACK COVER
+% _____________________________________________________________________________
+%
+%\setbackpagepic{img/fav} % <== an example of one possible option (read this manual)
+%\setqrcodebaseurl{https://mycloud.org/show=pdf&docid=} % <== another example
+%\setbackpageqrcode{54321} % <== and one more (uncomment the one that makes sense for you)
+\setbackpageqrcode
+\backpage
+\end{document}

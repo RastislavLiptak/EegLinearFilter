@@ -13,8 +13,6 @@
 #include <arm_neon.h>
 #include <vector>
 
-#define ALIGN_HINT(ptr) __builtin_assume_aligned((ptr), 16)
-
 template <int Radius, int ChunkSize>
 void convolve_par_naive(const NeonVector& data, NeonVector& outputBuffer, const std::vector<float>& convolutionKernel) {
     const size_t dataSize = data.size();

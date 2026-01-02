@@ -46,7 +46,6 @@ enum class ProcessingMode {
 // --- CPU parameters ---
 #define CHUNK_SIZE 8192 // NOTE: must be a multiple of 16 for optimal NEON alignment.
 #define K_BATCH 32
-#define PREFETCH_LOOKAHEAD 64
 
 // --- GPU parameters ---
 #define THREADS_PER_GROUP 256 // NOTE: must be a multiple of 32 (Apple GPU SIMD width).
@@ -72,9 +71,7 @@ static_assert(KERNEL_SIGMA > 0.0f, "KERNEL_SIGMA must be positive for a valid ke
 static_assert(CHUNK_SIZE > 0, "CHUNK_SIZE must be greater than 0.");
 static_assert(K_BATCH > 0, "K_BATCH must be greater than 0.");
 static_assert(K_BATCH % 4 == 0, "K_BATCH must be divisible by 4 (due to manual unrolling stride).");
-static_assert(K_BATCH <= 64, "K_BATCH is too large! Keep it <= 64 to avoid register spilling and performance degradation.");
 static_assert(K_BATCH == 32, "K_BATCH must be 32 due to the implementation of manually vectorized algorithms..");
-static_assert(PREFETCH_LOOKAHEAD > 0, "PREFETCH_LOOKAHEAD must be greater than 0.");
 
 // --- GPU parameters ---
 static_assert(THREADS_PER_GROUP > 0, "THREADS_PER_GROUP must be greater than 0.");

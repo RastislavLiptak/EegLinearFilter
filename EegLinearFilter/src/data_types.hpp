@@ -81,7 +81,7 @@ struct aligned_allocator {
     template <class U> bool operator!=(const aligned_allocator<U, Alignment>&) const noexcept { return false; }
 };
 
-using NeonVector = std::vector<float, aligned_allocator<float, 4096>>;
+using NeonVector = std::vector<float, aligned_allocator<float, 16384>>;
 
 struct EdfData {
     NeonVector samples;
